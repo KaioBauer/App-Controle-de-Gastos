@@ -50,3 +50,11 @@ export function sendLock(): Promise<void> {
     () => undefined,
   );
 }
+
+/**
+ * Esconde todo o conteúdo do app (inclusive folhas abertas), deixando só a tela de bloqueio.
+ * Mexe direto no DOM para valer na hora, antes do iPhone tirar a foto do alternador de apps.
+ */
+export function hideAppContent(hidden: boolean) {
+  document.documentElement.classList.toggle('app-locked', hidden);
+}

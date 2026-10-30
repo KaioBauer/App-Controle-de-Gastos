@@ -1,9 +1,9 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { Route, Routes, useLocation, useNavigate } from 'react-router';
 import { api, ApiError } from './lib/api';
-import { isPageUnloading, LOCK_GRACE_MS, LOCKED_EVENT, markUnlocked, sendLock, unlockedThisSession } from './lib/lock';
+import { hideAppContent, isPageUnloading, LOCK_GRACE_MS, LOCKED_EVENT, markUnlocked, sendLock, unlockedThisSession } from './lib/lock';
 import { isIOS, isStandalone, setBadge } from './lib/platform';
 import { syncSubscription } from './lib/push';
 import { Analysis } from './screens/Analysis';
@@ -115,11 +115,22 @@ function useAppLock(me: Me | null | undefined) {
     if (!appLock) return;
     let hiddenAt = 0;
     let pendingLock: Promise<void> = Promise.resolve();
+    const cover = () => {
+      hideAppContent(true);
+      flushSync(() => setCovered(true));
+    };
+    // O gesto de sair do app tira o foco antes de esconder a página: cobre já aqui
+    const onBlur = () => {
+      if (!isPageUnloading()) cover();
+    };
+    const onFocus = () => {
+      if (document.visibilityState === 'visible' && !hiddenAt) setCovered(false);
+    };
     const onVisibility = () => {
       if (document.visibilityState === 'hidden') {
         if (isPageUnloading()) return;
         hiddenAt = Date.now();
-        flushSync(() => setCovered(true));
+        cover();
         markUnlocked(false);
         pendingLock = sendLock();
         return;
@@ -143,8 +154,21 @@ function useAppLock(me: Me | null | undefined) {
         .finally(() => setCovered(false));
     };
     document.addEventListener('visibilitychange', onVisibility);
-    return () => document.removeEventListener('visibilitychange', onVisibility);
+    window.addEventListener('blur', onBlur);
+    window.addEventListener('focus', onFocus);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('blur', onBlur);
+      window.removeEventListener('focus', onFocus);
+    };
   }, [appLock, setLocked]);
+
+  // Enquanto bloqueado ou coberto, nada do app fica visível por trás
+  const hidden = locked || covered;
+  useLayoutEffect(() => {
+    hideAppContent(hidden);
+  }, [hidden]);
+  useEffect(() => () => hideAppContent(false), []);
 
   const onUnlocked = useCallback(() => {
     markUnlocked(true);

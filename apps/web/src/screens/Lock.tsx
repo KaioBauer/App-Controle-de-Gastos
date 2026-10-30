@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ScanFace } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { createPortal } from 'react-dom';
 import { api, clearOfflineData } from '../lib/api';
 import { unlockWithPasskey } from '../lib/passkey';
 import { setBadge } from '../lib/platform';
@@ -44,7 +45,8 @@ export function LockScreen({ cover = false, onUnlocked }: { cover?: boolean; onU
   };
   const error = byPassword.error ?? faceId.error;
 
-  return (
+  // Direto no body: fica fora do conteúdo do app, que é escondido inteiro enquanto bloqueado
+  return createPortal(
     <div className="dark-screen lock-screen" role="dialog" aria-modal="true" aria-label="Kaixa bloqueado">
       <div className="dark-screen-inner">
         <Brand />
@@ -115,6 +117,7 @@ export function LockScreen({ cover = false, onUnlocked }: { cover?: boolean; onU
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

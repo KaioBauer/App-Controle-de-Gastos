@@ -647,3 +647,5 @@ a.item:active { background: var(--fill); }
 
 /* Bloqueio com Face ID: cobre o app inteiro, inclusive as folhas abertas */
 .lock-screen { position: fixed; inset: 0; z-index: 100; overflow-y: auto; }
+html.app-locked body > *:not(.lock-screen) { visibility: hidden !important; }
+html.app-locked body { overflow: hidden; }
