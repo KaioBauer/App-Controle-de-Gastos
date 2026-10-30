@@ -3,9 +3,9 @@ import type { Account, Category, Prisma, Transaction } from '@prisma/client';
 import { prisma } from '../../lib/db';
 import type { FlowTx } from '../../domain/spending';
 
-type TxWithRelations = Transaction & { category: Category | null; account: Pick<Account, 'name'> };
+type TxWithRelations = Transaction & { category: Category | null; account: Pick<Account, 'name' | 'type'> };
 
-export const txInclude = { category: true, account: { select: { name: true } } } satisfies Prisma.TransactionInclude;
+export const txInclude = { category: true, account: { select: { name: true, type: true } } } satisfies Prisma.TransactionInclude;
 
 export function toCategoryDTO(c: Category): CategoryDTO {
   return { id: c.id, name: c.name, icon: c.icon, kind: c.kind };
@@ -19,8 +19,16 @@ export function toTransactionDTO(t: TxWithRelations): TransactionDTO {
     localDate: t.localDate,
     date: t.date.toISOString(),
     category: t.category ? toCategoryDTO(t.category) : null,
+    accountId: t.accountId,
     accountName: t.account.name,
+    accountType: t.account.type,
     isTransfer: t.isTransfer,
+    reviewed: t.reviewed,
+    manual: t.pluggyId === null,
+    notes: t.notes,
+    tags: t.tags,
+    status: t.status,
+    installment: t.installmentNumber && t.totalInstallments ? { number: t.installmentNumber, total: t.totalInstallments } : null,
   };
 }
 

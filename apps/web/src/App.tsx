@@ -11,6 +11,7 @@ import { Connections } from './screens/Connections';
 import { Home } from './screens/Home';
 import { InstallGuide } from './screens/InstallGuide';
 import { NotificationSettings } from './screens/NotificationSettings';
+import { Rules } from './screens/Rules';
 import { Settings } from './screens/Settings';
 import { Transactions } from './screens/Transactions';
 import { Welcome } from './screens/Welcome';
@@ -118,6 +119,7 @@ export function App() {
         <Route path="/ajustes" element={<Settings />} />
         <Route path="/ajustes/notificacoes" element={<NotificationSettings />} />
         <Route path="/ajustes/conexoes" element={<Connections />} />
+        <Route path="/ajustes/regras" element={<Rules />} />
         <Route path="*" element={<Home />} />
       </Routes>
       <Dock />

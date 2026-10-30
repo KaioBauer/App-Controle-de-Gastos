@@ -17,8 +17,38 @@ export interface TransactionDTO {
   /** ISO, para mostrar a hora */
   date: string;
   category: CategoryDTO | null;
+  accountId: string;
   accountName: string;
+  accountType: 'BANK' | 'CREDIT' | 'INVESTMENT' | 'CASH';
   isTransfer: boolean;
+  reviewed: boolean;
+  /** Lançamento manual: pode ser editado e apagado */
+  manual: boolean;
+  notes: string | null;
+  tags: string[];
+  status: string | null;
+  installment: { number: number; total: number } | null;
+}
+
+export interface TransactionListDTO {
+  items: TransactionDTO[];
+  nextCursor: string | null;
+  /** Só na primeira página: somas de tudo que bate com o filtro */
+  totals?: { count: number; expenseCents: number; incomeCents: number };
+}
+
+export interface AccountDTO {
+  id: string;
+  name: string;
+  type: 'BANK' | 'CREDIT' | 'INVESTMENT' | 'CASH';
+}
+
+export interface RuleDTO {
+  id: string;
+  label: string;
+  category: CategoryDTO;
+  /** Quantas transações a regra cobre hoje */
+  matches: number;
 }
 
 export interface SummaryDTO {

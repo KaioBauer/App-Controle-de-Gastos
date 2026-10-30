@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useRef } from 'react';
 import { Link } from 'react-router';
 import { Money, useCountUp, usePrivacy } from '../lib/privacy';
-import { useSummary } from '../lib/queries';
+import { useSummary, useUnreviewedCount } from '../lib/queries';
 import { OfflineBanner, relativeDay, TxRow } from '../ui/common';
 
 function greeting(now: Date) {
@@ -19,6 +19,7 @@ export function Home() {
   const name = capitalize(me?.username ?? '');
   const { hidden, toggle } = usePrivacy();
   const { data, error } = useSummary();
+  const unreviewed = useUnreviewedCount().data?.count ?? 0;
   const balance = useCountUp(data?.balanceCents ?? 0);
 
   // Destaca linhas que surgiram depois do primeiro carregamento (ex.: gasto recém-lançado)
@@ -121,9 +122,16 @@ export function Home() {
 
       <div className="section-title fu" style={{ animationDelay: '220ms' }}>
         <h2 className="h2">Movimentações</h2>
-        <Link to="/transacoes" className="link">
-          Ver tudo
-        </Link>
+        <span className="row" style={{ gap: 12 }}>
+          {!!unreviewed && (
+            <Link to="/transacoes?unreviewed=1" className="tag" aria-label={`${unreviewed} transações para revisar`}>
+              {unreviewed} para revisar
+            </Link>
+          )}
+          <Link to="/transacoes" className="link">
+            Ver tudo
+          </Link>
+        </span>
       </div>
 
       <div className="list">

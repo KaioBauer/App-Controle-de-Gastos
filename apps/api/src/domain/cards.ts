@@ -1,6 +1,8 @@
 import { addMonthsYmd, diffDays } from '@financas/shared';
-import { normalizeDescription } from './pluggy-mapping';
+import { merchantKey } from './merchant';
 import { spendingOf, type FlowTx } from './spending';
+
+export { merchantKey };
 
 /** Transação de cartão com o necessário para faturas, recorrentes e parcelas. */
 export interface CardTx extends FlowTx {
@@ -69,15 +71,6 @@ export function futureBills(txs: CardTx[], cycle: BillCycle, months = 6): { clos
 // ---------------------------------------------------------------------------
 // Despesas fixas (recorrentes)
 // ---------------------------------------------------------------------------
-
-/** Chave estável de estabelecimento: tira "6/9", números soltos e prefixos de adquirente. */
-export function merchantKey(description: string): string {
-  return normalizeDescription(description)
-    .replace(/\b\d+\s*\d*\b/g, ' ')
-    .replace(/^(dl|dm|ebn|pg|pag|mp|jim com|ifd|ec)\s+/, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
 
 export interface Recurring {
   key: string;

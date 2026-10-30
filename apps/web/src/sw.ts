@@ -17,8 +17,13 @@ clientsClaim();
 
 // App shell: abre offline
 cleanupOutdatedCaches();
-precacheAndRoute(self.__WB_MANIFEST);
-registerRoute(new NavigationRoute(createHandlerBoundToURL('index.html'), { denylist: [/^\/api\//] }));
+const manifest = self.__WB_MANIFEST;
+precacheAndRoute(manifest);
+// Em desenvolvimento o precache vem vazio e createHandlerBoundToURL lançaria erro,
+// derrubando o SW inteiro (e o push junto)
+if (manifest.some((e) => (typeof e === 'string' ? e : e.url) === 'index.html')) {
+  registerRoute(new NavigationRoute(createHandlerBoundToURL('index.html'), { denylist: [/^\/api\//] }));
+}
 
 // Últimos dados da API ficam em cache para uso offline (o app mostra o aviso "dados offline")
 registerRoute(

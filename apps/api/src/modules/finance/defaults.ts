@@ -1,4 +1,5 @@
 import type { CategoryKind } from '@prisma/client';
+import { merchantKey } from '../../domain/merchant';
 import { prisma } from '../../lib/db';
 
 const DEFAULT_CATEGORIES: { name: string; icon: string; kind: CategoryKind }[] = [
@@ -32,4 +33,21 @@ export async function ensureDefaults() {
   );
   const cash = await prisma.account.findFirst({ where: { type: 'CASH' } });
   if (!cash) await prisma.account.create({ data: { name: CASH_ACCOUNT_NAME, type: 'CASH' } });
+  await backfillMerchantKeys();
+}
+
+/** Preenche merchantKey de transações antigas (criadas antes do campo existir). */
+async function backfillMerchantKeys() {
+  for (;;) {
+    const rows = await prisma.transaction.findMany({
+      where: { merchantKey: null },
+      select: { id: true, description: true },
+      take: 500,
+    });
+    if (rows.length === 0) return;
+    await prisma.$transaction(
+      // String vazia marca "sem chave" para não reprocessar
+      rows.map((r) => prisma.transaction.update({ where: { id: r.id }, data: { merchantKey: merchantKey(r.description) } })),
+    );
+  }
 }

@@ -71,7 +71,8 @@ interface MoneyProps {
 /** Valor em BRL que respeita "ocultar valores". */
 export function Money({ cents, sign = 'none', splitSymbol, symbolStyle, className, style }: MoneyProps) {
   const { hidden } = usePrivacy();
-  const prefix = sign === 'auto' && cents !== 0 ? (cents < 0 ? '−' : '+') : '';
+  // Oculto também esconde o sinal: "−R$ ••••" revelaria que o saldo está negativo
+  const prefix = sign === 'auto' && cents !== 0 && !hidden ? (cents < 0 ? '−' : '+') : '';
   const value = hidden ? '••••' : formatAmount(cents);
   return (
     <span className={`num ${className ?? ''}`} style={style}>

@@ -5,6 +5,7 @@
   --surface: #ffffff;
   --fill: #f2f3f5; /* trilhas, chips e tiles sobre superfícies */
   --track: #e6e8eb; /* fundo do segmented control */
+  --seg-on: #ffffff; /* indicador do segmented control */
   --ink: #0e0f12;
   --ink-2: #6b7079;
   --ink-3: #8b9099;
@@ -44,6 +45,7 @@
     --surface: #1a1c21;
     --fill: #26292f;
     --track: #1a1c21;
+    --seg-on: #3a3d44;
     --ink: #f2f3f5;
     --ink-2: #a3a8b0;
     --ink-3: #8b9099;
@@ -257,6 +259,40 @@ p {
 button.item:active,
 a.item:active { background: var(--fill); }
 .item-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+/* Transação ainda não revisada */
+.unreviewed-dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 6px;
+  background: var(--accent);
+  border: 2px solid var(--surface);
+}
+/* Campo de busca */
+.search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 48px;
+  padding: 0 16px;
+  border-radius: 24px;
+  background: var(--surface);
+  color: var(--ink-2);
+}
+.search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  outline: none;
+  font-size: 16px;
+  color: var(--ink);
+}
+.search input::placeholder { color: var(--ink-3); }
+/* O app tem o próprio botão de limpar */
+.search input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; display: none; }
 .item-title { font-size: 15px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .item-sub { font-size: 13px; color: var(--ink-2); }
 .item-amt { font-size: 15px; font-weight: 600; white-space: nowrap; }
@@ -283,10 +319,12 @@ a.item:active { background: var(--fill); }
   left: 4px;
   height: 36px;
   border-radius: 14px;
-  background: var(--surface);
+  background: var(--seg-on);
   box-shadow: 0 1px 3px rgba(14, 15, 18, 0.08);
   transition: transform 0.45s var(--ease-sheet);
 }
+/* Dentro de uma folha o fundo da página é a própria superfície: usa o tom de preenchimento */
+.sheet .segmented { background: var(--fill); }
 .seg {
   flex: 1;
   height: 36px;
@@ -343,12 +381,30 @@ a.item:active { background: var(--fill); }
   justify-content: space-between;
   padding: 0 6px;
   box-shadow: var(--shadow);
+  position: relative;
+}
+/* Pílula da aba ativa: desliza entre as abas (posição e largura medidas no Dock) */
+.tab-pill {
+  position: absolute;
+  top: 8px;
+  left: 0;
+  height: 48px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.12);
+  pointer-events: none;
+}
+.tab-pill[data-animate='true'] {
+  transition:
+    transform 0.4s var(--ease-sheet),
+    width 0.4s var(--ease-sheet),
+    opacity 0.2s ease;
 }
 /* 4 abas: as inativas ficam só com o ícone (44px), a ativa mostra o nome */
 .tab {
   display: flex;
   align-items: center;
-  gap: 6px;
+  /* Sem gap: o espaço entre ícone e nome fica no .lb, só quando ele aparece */
+  gap: 0;
   height: 48px;
   min-width: 44px;
   flex-shrink: 0;
@@ -365,10 +421,20 @@ a.item:active { background: var(--fill); }
   white-space: nowrap;
   font-size: 13px;
   font-weight: 500;
-  transition: max-width 0.4s var(--ease-sheet), opacity 0.25s ease;
+  margin-left: 0;
+  transition: max-width 0.4s var(--ease-sheet), opacity 0.25s ease, margin-left 0.4s var(--ease-sheet);
 }
-.tab[aria-current='page'] { background: rgba(255, 255, 255, 0.12); color: #ffffff; }
-.tab[aria-current='page'] .lb { max-width: 110px; opacity: 1; }
+.tab { position: relative; z-index: 1; }
+.tab svg { transition: transform 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.4); }
+.tab:active svg { transform: scale(0.88); }
+.tab[aria-current='page'] { color: #ffffff; }
+.tab[aria-current='page'] .lb { max-width: 110px; opacity: 1; margin-left: 6px; }
+/* Telas muito estreitas (iPhone SE 1ª geração, zoom de tela): a aba ativa fica só com o ícone */
+.dock-inner { container-type: inline-size; }
+@container (max-width: 340px) {
+  .tab { padding: 0 10px; }
+  .tab[aria-current='page'] .lb { max-width: 0; opacity: 0; margin-left: 0; }
+}
 .fab {
   pointer-events: auto;
   width: 64px;

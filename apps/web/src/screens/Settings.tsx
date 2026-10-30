@@ -1,10 +1,12 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Bell, ChevronRight, EyeOff, Landmark, LogOut } from 'lucide-react';
+import { Bell, ChevronRight, EyeOff, Landmark, LogOut, Wand2 } from 'lucide-react';
 import { Link } from 'react-router';
 import { api, clearOfflineData } from '../lib/api';
 import { setBadge } from '../lib/platform';
 import { usePrivacy } from '../lib/privacy';
 import { OfflineBanner, PageHeader, Switch } from '../ui/common';
+
+const buildDate = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Sao_Paulo' });
 
 export function Settings() {
   const qc = useQueryClient();
@@ -13,10 +15,11 @@ export function Settings() {
   const logout = useMutation({
     mutationFn: () => api('/auth/logout', { method: 'POST' }),
     onSettled: async () => {
+      // Primeiro a tela vai para o login; qc.clear() antes descartaria a consulta que o App observa
+      qc.setQueryData(['me'], null);
+      qc.removeQueries({ predicate: (q) => q.queryKey[0] !== 'me' });
       await clearOfflineData();
       await setBadge(0);
-      qc.clear();
-      qc.setQueryData(['me'], null);
     },
   });
 
@@ -48,6 +51,19 @@ export function Settings() {
         </Link>
       </div>
 
+      <div className="list fu" style={{ animationDelay: '90ms' }}>
+        <Link to="/ajustes/regras" className="item">
+          <span className="tile">
+            <Wand2 size={20} strokeWidth={1.8} aria-hidden="true" />
+          </span>
+          <span className="item-main">
+            <span className="item-title">Regras de categoria</span>
+            <span className="item-sub">Categorias automáticas por estabelecimento</span>
+          </span>
+          <ChevronRight className="item-chevron" size={20} aria-hidden="true" />
+        </Link>
+      </div>
+
       <div className="list fu" style={{ animationDelay: '120ms' }}>
         <button type="button" className="item" role="switch" aria-checked={hidden} onClick={toggle}>
           <span className="tile">
@@ -73,6 +89,9 @@ export function Settings() {
           </span>
         </button>
       </div>
+      <p className="small muted" style={{ textAlign: 'center' }}>
+        Kaixa · versão de {buildDate.format(new Date(__APP_BUILD__))}
+      </p>
     </main>
   );
 }

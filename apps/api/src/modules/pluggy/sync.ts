@@ -1,5 +1,6 @@
 import { addDays, localDate, toCents } from '@financas/shared';
 import type { FastifyBaseLogger } from 'fastify';
+import { merchantKey, ruleCategory } from '../../domain/merchant';
 import { accountAmount, mapCategory, pluggyLocalDate, reconcile, signedCents } from '../../domain/pluggy-mapping';
 import { prisma } from '../../lib/db';
 import type { PluggyAccount, PluggyClient, PluggyTransaction } from './client';
@@ -69,14 +70,14 @@ async function doSync(client: PluggyClient, itemId: string, log: FastifyBaseLogg
       ? addDays(today, -BACKFILL_DAYS)
       : addDays(localDate(local.lastSyncAt!), -OVERLAP_DAYS);
 
-    const categories = new Map((await prisma.category.findMany()).map((c) => [c.name, c.id]));
+    const catalog = await loadCatalog();
     const accounts = await client.listAccounts(itemId);
     result.accounts = accounts.length;
 
     for (const acc of accounts) {
       const accountId = await upsertAccount(itemId, acc);
       const txs = await client.listTransactions(acc.id, dateFrom);
-      const r = await applyTransactions(accountId, txs, dateFrom, categories, firstSync);
+      const r = await applyTransactions(accountId, txs, dateFrom, catalog, firstSync);
       result.created += r.created.length;
       result.updated += r.updated;
       result.removed += r.removed;
@@ -135,11 +136,35 @@ async function upsertAccount(itemId: string, acc: PluggyAccount): Promise<string
   return row.id;
 }
 
+/** Categorias (por nome e tipo) e regras do usuário, carregadas uma vez por sync. */
+export interface Catalog {
+  idByName: Map<string, string>;
+  kindById: Map<string, string>;
+  rules: Map<string, string>;
+}
+
+export async function loadCatalog(): Promise<Catalog> {
+  const [cats, rules] = await Promise.all([prisma.category.findMany(), prisma.categoryRule.findMany()]);
+  return {
+    idByName: new Map(cats.map((c) => [c.name, c.id])),
+    kindById: new Map(cats.map((c) => [c.id, c.kind])),
+    rules: new Map(rules.map((r) => [r.pattern, r.categoryId])),
+  };
+}
+
+/** Regra do usuário primeiro; senão, o mapeamento automático da categoria da Pluggy. */
+export function categorize(catalog: Catalog, pluggyCategory: string | null, type: 'DEBIT' | 'CREDIT', description: string) {
+  const ruled = ruleCategory(description, catalog.rules);
+  if (ruled) return { categoryId: ruled, isTransfer: catalog.kindById.get(ruled) === 'TRANSFER' };
+  const m = mapCategory(pluggyCategory, type, description);
+  return { categoryId: catalog.idByName.get(m.name) ?? null, isTransfer: m.isTransfer };
+}
+
 async function applyTransactions(
   accountId: string,
   txs: PluggyTransaction[],
   dateFrom: string,
-  categories: Map<string, string>,
+  catalog: Catalog,
   firstSync: boolean,
 ) {
   const existing = await prisma.transaction.findMany({
@@ -168,6 +193,7 @@ async function applyTransactions(
     localDate: t.localDate,
     description: t.description,
     merchant: t.raw.merchant?.businessName ?? t.raw.merchant?.name ?? null,
+    merchantKey: merchantKey(t.description) || null,
     pluggyCategory: t.raw.category,
     status: t.raw.status ?? null,
     installmentNumber: t.raw.creditCardMetadata?.installmentNumber ?? null,
@@ -175,10 +201,7 @@ async function applyTransactions(
     billId: t.raw.creditCardMetadata?.billId ?? null,
     purchaseDate: t.raw.creditCardMetadata?.purchaseDate ? pluggyLocalDate(t.raw.creditCardMetadata.purchaseDate) : null,
   });
-  const autoCategory = (t: (typeof incoming)[number]) => {
-    const m = mapCategory(t.raw.category, t.raw.type, t.description);
-    return { categoryId: categories.get(m.name) ?? null, isTransfer: m.isTransfer };
-  };
+  const autoCategory = (t: (typeof incoming)[number]) => categorize(catalog, t.raw.category, t.raw.type, t.description);
 
   const created: string[] = [];
   await prisma.$transaction(async (db) => {

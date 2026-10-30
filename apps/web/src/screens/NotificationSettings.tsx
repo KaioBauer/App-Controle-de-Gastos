@@ -8,6 +8,7 @@ import { PageHeader } from '../ui/common';
 
 const STATE_LABEL: Record<PushState, string> = {
   unsupported: 'Não suportado',
+  unavailable: 'Indisponível',
   denied: 'Bloqueadas',
   default: 'Desativadas',
   'granted-unsubscribed': 'Desativadas',
@@ -145,6 +146,8 @@ export function NotificationSettings() {
           <Note>As notificações foram bloqueadas. {BLOCKED_HINT}</Note>
         ) : state === 'unsupported' ? (
           <Note>Este navegador não suporta notificações push. No iPhone é preciso iOS 16.4 ou superior.</Note>
+        ) : state === 'unavailable' ? (
+          <Note>O app não terminou de carregar o serviço de notificações. Feche e abra o app de novo.</Note>
         ) : null}
       </div>
 

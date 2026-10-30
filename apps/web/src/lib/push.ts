@@ -1,7 +1,12 @@
 import { api } from './api';
 import { pushSupported } from './platform';
 
-export type PushState = 'unsupported' | 'denied' | 'default' | 'subscribed' | 'granted-unsubscribed';
+export type PushState = 'unsupported' | 'unavailable' | 'denied' | 'default' | 'subscribed' | 'granted-unsubscribed';
+
+/** Espera o service worker por no máximo `ms`: se ele não carregar, a tela não fica presa. */
+function swReady(ms = 5000): Promise<ServiceWorkerRegistration | null> {
+  return Promise.race([navigator.serviceWorker.ready, new Promise<null>((r) => setTimeout(() => r(null), ms))]);
+}
 
 function base64UrlToUint8Array(base64Url: string): Uint8Array<ArrayBuffer> {
   const padding = '='.repeat((4 - (base64Url.length % 4)) % 4);
@@ -15,7 +20,8 @@ function base64UrlToUint8Array(base64Url: string): Uint8Array<ArrayBuffer> {
 export async function getPushState(): Promise<PushState> {
   if (!pushSupported()) return 'unsupported';
   if (Notification.permission === 'denied') return 'denied';
-  const reg = await navigator.serviceWorker.ready;
+  const reg = await swReady();
+  if (!reg) return 'unavailable';
   const sub = await reg.pushManager.getSubscription();
   if (sub) return 'subscribed';
   return Notification.permission === 'granted' ? 'granted-unsubscribed' : 'default';

@@ -1,15 +1,19 @@
 import type {
+  AccountDTO,
   AnalysisDTO,
   BudgetsDTO,
   CardsDTO,
   CategoryDTO,
   ConnectionsDTO,
   Period,
+  RuleDTO,
   SummaryDTO,
   TransactionDTO,
+  TransactionListDTO,
 } from '@financas/shared';
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './api';
+import { setBadge } from './platform';
 
 export const useSummary = () => useQuery({ queryKey: ['summary'], queryFn: () => api<SummaryDTO>('/summary') });
 
@@ -26,38 +30,132 @@ export const useBudgets = () => useQuery({ queryKey: ['budgets'], queryFn: () =>
 export const useCategories = () =>
   useQuery({ queryKey: ['categories'], queryFn: () => api<CategoryDTO[]>('/categories'), staleTime: 5 * 60_000 });
 
-export const useTransactions = () =>
+export interface TxFilters {
+  q?: string;
+  type?: 'expense' | 'income' | 'transfer';
+  unreviewed?: boolean;
+  accountId?: string;
+  categoryId?: string;
+  from?: string;
+  to?: string;
+}
+
+function filterParams(f: TxFilters, cursor: string | null) {
+  const p = new URLSearchParams();
+  if (f.q) p.set('q', f.q);
+  if (f.type) p.set('type', f.type);
+  if (f.unreviewed) p.set('unreviewed', '1');
+  if (f.accountId) p.set('accountId', f.accountId);
+  if (f.categoryId) p.set('categoryId', f.categoryId);
+  if (f.from) p.set('from', f.from);
+  if (f.to) p.set('to', f.to);
+  if (cursor) p.set('cursor', cursor);
+  const s = p.toString();
+  return s ? `?${s}` : '';
+}
+
+export const useTransactions = (filters: TxFilters = {}) =>
   useInfiniteQuery({
-    queryKey: ['transactions'],
+    queryKey: ['transactions', filters],
     initialPageParam: null as string | null,
-    queryFn: ({ pageParam }) =>
-      api<{ items: TransactionDTO[]; nextCursor: string | null }>(`/transactions${pageParam ? `?cursor=${pageParam}` : ''}`),
+    queryFn: ({ pageParam }) => api<TransactionListDTO>(`/transactions${filterParams(filters, pageParam)}`),
     getNextPageParam: (last) => last.nextCursor,
+    placeholderData: keepPreviousData,
   });
 
-/** Tudo que depende de transações ou orçamentos é recarregado após uma mudança. */
+export const useAccounts = () =>
+  useQuery({ queryKey: ['accounts'], queryFn: () => api<AccountDTO[]>('/accounts'), staleTime: 5 * 60_000 });
+
+export const useSimilar = (id: string | null) =>
+  useQuery({
+    queryKey: ['similar', id],
+    queryFn: () => api<{ count: number; rule: { id: string; category: CategoryDTO } | null }>(`/transactions/${id}/similar`),
+    enabled: !!id,
+  });
+
+export const useUnreviewedCount = () =>
+  useQuery({ queryKey: ['badge'], queryFn: () => api<{ count: number }>('/badge') });
+
+export const useRules = () => useQuery({ queryKey: ['rules'], queryFn: () => api<RuleDTO[]>('/rules') });
+
+/** Atualiza o número no ícone depois de revisar transações. */
+async function refreshBadge() {
+  const { count } = await api<{ count: number }>('/badge').catch(() => ({ count: 0 }));
+  await setBadge(count);
+}
+
+/**
+ * Tudo que depende de transações ou orçamentos é recarregado após uma mudança.
+ * Roda em segundo plano (sem await): a tela responde na hora em vez de esperar os refetches.
+ */
 function useInvalidateFinance() {
   const qc = useQueryClient();
-  return () =>
-    Promise.all(
-      ['summary', 'analysis', 'budgets', 'transactions', 'cards'].map((key) => qc.invalidateQueries({ queryKey: [key] })),
-    );
+  return () => {
+    void Promise.all([
+      ...['summary', 'analysis', 'budgets', 'transactions', 'cards', 'bill', 'similar', 'rules', 'badge'].map((key) =>
+        qc.invalidateQueries({ queryKey: [key] }),
+      ),
+      refreshBadge(),
+    ]);
+  };
 }
 
 export function useCreateTransaction() {
   const invalidate = useInvalidateFinance();
   return useMutation({
-    mutationFn: (body: { amountCents: number; categoryId: string; kind?: 'expense' | 'income'; description?: string }) =>
+    mutationFn: (body: { amountCents: number; categoryId: string; kind?: 'expense' | 'income'; description?: string; localDate?: string }) =>
       api<TransactionDTO>('/transactions', { method: 'POST', body }),
     onSuccess: invalidate,
   });
 }
 
+export function useUpdateTransaction() {
+  const invalidate = useInvalidateFinance();
+  return useMutation({
+    mutationFn: ({ id, ...body }: { id: string; notes?: string | null; tags?: string[]; reviewed?: boolean; amountCents?: number; kind?: 'expense' | 'income'; description?: string; localDate?: string }) =>
+      api<TransactionDTO>(`/transactions/${id}`, { method: 'PATCH', body }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useRecategorize() {
+  const invalidate = useInvalidateFinance();
+  return useMutation({
+    mutationFn: ({ id, ...body }: { id: string; categoryId: string; applyToSimilar: boolean; createRule: boolean }) =>
+      api<{ transaction: TransactionDTO; similarUpdated: number; ruleCreated: boolean }>(`/transactions/${id}/recategorize`, {
+        method: 'POST',
+        body,
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useReview() {
+  const invalidate = useInvalidateFinance();
+  return useMutation({
+    mutationFn: (body: { ids: string[] } | { all: true }) => api<{ updated: number }>('/transactions/review', { method: 'POST', body }),
+    onSuccess: invalidate,
+  });
+}
+
 export function useDeleteTransaction() {
+  const qc = useQueryClient();
   const invalidate = useInvalidateFinance();
   return useMutation({
     mutationFn: (id: string) => api(`/transactions/${id}`, { method: 'DELETE' }),
-    onSuccess: invalidate,
+    onSuccess: (_r, id) => {
+      // A transação não existe mais: não tenta recarregar as "parecidas" dela
+      qc.removeQueries({ queryKey: ['similar', id] });
+      invalidate();
+    },
+  });
+}
+
+export function useDeleteRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api(`/rules/${id}`, { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['rules'] }),
   });
 }
 

@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router';
 import { useOnline } from '../lib/platform';
 import { Money } from '../lib/privacy';
 import { CategoryIcon } from './icons';
+import { useOpenTransaction } from './TransactionSheet';
 
 /** Cabeçalho das telas internas: voltar + título grande. */
 export function PageHeader({ title, back, subtitle }: { title: string; back?: string; subtitle?: React.ReactNode }) {
@@ -45,18 +46,33 @@ export function relativeDay(localDate: string, iso: string, today: string, yeste
 }
 
 export function TxRow({ tx, meta, isNew, delay }: { tx: TransactionDTO; meta: string; isNew?: boolean; delay?: number }) {
-  const income = tx.amountCents > 0;
+  const open = useOpenTransaction();
+  const income = tx.amountCents > 0 && !tx.isTransfer;
+  // Estorno numa categoria de gasto: valor em verde, mas com o ícone da categoria
+  const incomeIcon = income && (!tx.category || tx.category.kind === 'INCOME');
   return (
-    <div className={`item ${isNew ? 'newrow' : 'fu'}`} style={{ animationDelay: `${isNew ? 0 : (delay ?? 0)}ms` }}>
-      <div className={`tile ${income ? 'tile-accent' : ''}`}>
-        <CategoryIcon icon={income ? 'income' : tx.category?.icon} />
+    <button
+      type="button"
+      className={`item ${isNew ? 'newrow' : 'fu'}`}
+      style={{ animationDelay: `${isNew ? 0 : (delay ?? 0)}ms` }}
+      onClick={() => open?.(tx)}
+      aria-label={`${tx.description}${tx.reviewed ? '' : ', não revisada'}`}
+    >
+      <div className={`tile ${incomeIcon ? 'tile-accent' : ''}`} style={{ position: 'relative' }}>
+        <CategoryIcon icon={incomeIcon ? 'income' : tx.category?.icon} />
+        {!tx.reviewed && <span className="unreviewed-dot" aria-hidden="true" />}
       </div>
       <div className="item-main">
         <span className="item-title">{tx.description}</span>
         <span className="item-sub">{meta}</span>
       </div>
-      <Money cents={tx.amountCents} sign="auto" className="item-amt" style={{ color: income ? 'var(--positive)' : 'var(--ink)' }} />
-    </div>
+      <Money
+        cents={tx.amountCents}
+        sign="auto"
+        className="item-amt"
+        style={{ color: income ? 'var(--positive)' : tx.isTransfer ? 'var(--ink-2)' : 'var(--ink)' }}
+      />
+    </button>
   );
 }
 

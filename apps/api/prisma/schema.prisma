@@ -59,6 +59,19 @@ model Category {
   createdAt    DateTime      @default(now())
   transactions Transaction[]
   budget       Budget?
+  rules        CategoryRule[]
+}
+
+// "Sempre categorizar <estabelecimento> como <categoria>": vale para o sync da Pluggy
+model CategoryRule {
+  id         String   @id @default(uuid())
+  // Chave normalizada do estabelecimento (ver domain/merchant.ts)
+  pattern    String   @unique
+  // Descrição original usada para criar a regra (para exibir)
+  label      String
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
 }
 
 enum AccountType {
@@ -157,12 +170,17 @@ model Transaction {
   localDate   String
   description String
   merchant    String?
+  // Chave normalizada do estabelecimento: agrupa "parecidas" e casa com CategoryRule
+  merchantKey String?
   categoryId  String?
   category    Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   // Categoria original da Pluggy (base do mapeamento automático)
   pluggyCategory String?
-  // true quando o usuário escolheu a categoria: o sync não sobrescreve
+  // true quando a categoria foi definida pelo usuário (nesta transação ou via "aplicar a parecidas"):
+  // o sync não sobrescreve
   categoryLocked Boolean @default(false)
+  // true só quando o usuário escolheu a categoria NESTA transação: "aplicar a parecidas" não mexe nela
+  categoryManual Boolean @default(false)
   // PENDING ou POSTED (Pluggy)
   status      String?
   installmentNumber Int?
@@ -183,6 +201,7 @@ model Transaction {
   @@index([categoryId, localDate])
   @@index([accountId, localDate])
   @@index([billId])
+  @@index([merchantKey])
 }
 
 // Limite mensal recorrente por categoria

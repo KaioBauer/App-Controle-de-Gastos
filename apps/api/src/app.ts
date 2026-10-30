@@ -6,6 +6,7 @@ import type { Env } from './env';
 import { authRoutes } from './modules/auth/routes';
 import { cardRoutes } from './modules/finance/cards';
 import { financeRoutes } from './modules/finance/routes';
+import { transactionRoutes } from './modules/finance/transactions';
 import type { PluggyClient } from './modules/pluggy/client';
 import { pluggyRoutes } from './modules/pluggy/routes';
 import { pushRoutes } from './modules/push/routes';
@@ -39,6 +40,7 @@ export async function buildApp(env: Env, pluggy: PluggyClient | null) {
       await api.register(pushRoutes, { env });
       await api.register(financeRoutes);
       await api.register(cardRoutes);
+      await api.register(transactionRoutes);
       await api.register(pluggyRoutes, { env, client: pluggy });
     },
     { prefix: '/api' },

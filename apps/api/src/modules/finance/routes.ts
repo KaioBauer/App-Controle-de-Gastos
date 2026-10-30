@@ -6,29 +6,9 @@ import { buildAnalysis, periodRange } from '../../domain/analysis';
 import { budgetProgress, incomeOf, spendingByCategory, sumSpending } from '../../domain/spending';
 import { prisma } from '../../lib/db';
 import { requireAuth } from '../../plugins/session';
-import {
-  balanceCents,
-  flowTxs,
-  toCategoryDTO,
-  toTransactionDTO,
-  txInclude,
-} from './queries';
+import { balanceCents, flowTxs, toCategoryDTO, toTransactionDTO, txInclude } from './queries';
 
-const YMD = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_CENTS = 99_999_999_99;
-
-const newTxBody = z.object({
-  amountCents: z.number().int().positive().max(MAX_CENTS),
-  kind: z.enum(['expense', 'income']).default('expense'),
-  categoryId: z.string().uuid(),
-  description: z.string().trim().max(200).optional(),
-  localDate: z.string().regex(YMD).optional(),
-});
-
-const listQuery = z.object({
-  cursor: z.string().uuid().optional(),
-  limit: z.coerce.number().int().min(1).max(100).default(50),
-});
 
 export async function financeRoutes(app: FastifyInstance) {
   app.addHook('preHandler', requireAuth);
@@ -79,64 +59,6 @@ export async function financeRoutes(app: FastifyInstance) {
       totalCents: budgets.reduce((s, b) => s + Number(b.limitCents), 0),
       categoryIds: new Set(budgets.map((b) => b.categoryId)),
     });
-  });
-
-  app.get('/transactions', async (request, reply) => {
-    const q = listQuery.safeParse(request.query);
-    if (!q.success) return reply.code(400).send({ error: 'Parâmetros inválidos' });
-    const rows = await prisma.transaction.findMany({
-      // Parcelas futuras ficam para a tela de cartões
-      where: { deletedAt: null, localDate: { lte: localDate(new Date()) } },
-      include: txInclude,
-      orderBy: [{ localDate: 'desc' }, { date: 'desc' }, { id: 'desc' }],
-      take: q.data.limit + 1,
-      ...(q.data.cursor ? { cursor: { id: q.data.cursor }, skip: 1 } : {}),
-    });
-    const hasMore = rows.length > q.data.limit;
-    const items = rows.slice(0, q.data.limit);
-    return { items: items.map(toTransactionDTO), nextCursor: hasMore ? items.at(-1)!.id : null };
-  });
-
-  // Lançamento manual (dinheiro em espécie)
-  app.post('/transactions', async (request, reply) => {
-    const body = newTxBody.safeParse(request.body);
-    if (!body.success) return reply.code(400).send({ error: 'Dados inválidos' });
-    const { amountCents, kind, categoryId, description, localDate: day } = body.data;
-
-    const [category, cash] = await Promise.all([
-      prisma.category.findUnique({ where: { id: categoryId } }),
-      prisma.account.findFirst({ where: { type: 'CASH' } }),
-    ]);
-    if (!category) return reply.code(400).send({ error: 'Categoria não encontrada' });
-    if (!cash) return reply.code(500).send({ error: 'Conta de dinheiro não configurada' });
-
-    const now = new Date();
-    const today = localDate(now);
-    const tx = await prisma.transaction.create({
-      data: {
-        accountId: cash.id,
-        amountCents: BigInt(kind === 'expense' ? -amountCents : amountCents),
-        // Datas passadas ficam ao meio-dia de Brasília
-        date: !day || day === today ? now : new Date(`${day}T12:00:00-03:00`),
-        localDate: day ?? today,
-        description: description || category.name,
-        categoryId,
-        reviewed: true,
-      },
-      include: txInclude,
-    });
-    return reply.code(201).send(toTransactionDTO(tx));
-  });
-
-  app.delete('/transactions/:id', async (request, reply) => {
-    const { id } = request.params as { id: string };
-    // Só lançamentos manuais podem ser apagados; os da Pluggy voltariam no próximo sync
-    const res = await prisma.transaction.updateMany({
-      where: { id, pluggyId: null, deletedAt: null },
-      data: { deletedAt: new Date() },
-    });
-    if (res.count === 0) return reply.code(404).send({ error: 'Lançamento não encontrado' });
-    return { ok: true };
   });
 
   app.get('/budgets', async (): Promise<BudgetsDTO> => {

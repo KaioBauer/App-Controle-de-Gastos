@@ -4,6 +4,9 @@ import { createPortal } from 'react-dom';
 
 const CLOSE_MS = 260;
 
+/** Folhas abertas, da mais antiga para a do topo: o Esc fecha só a do topo. */
+const openStack: symbol[] = [];
+
 /**
  * Controla abertura/fechamento com a animação de saída do design.
  * `close()` anima e só então desmonta.
@@ -42,12 +45,17 @@ export function Sheet({ state, onClose, title, children }: Props) {
     if (!visible) return;
     const previous = document.activeElement as HTMLElement | null;
     panel.current?.focus();
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onCloseRef.current();
+    const token = Symbol('sheet');
+    openStack.push(token);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && openStack.at(-1) === token) onCloseRef.current();
+    };
     document.addEventListener('keydown', onKey);
     // Evita rolar a página por trás do sheet
     const overflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
+      openStack.splice(openStack.indexOf(token), 1);
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = overflow;
       previous?.focus?.();

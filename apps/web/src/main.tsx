@@ -5,8 +5,12 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router';
 import { App } from './App';
 import { PrivacyProvider } from './lib/privacy';
+import { keepAppUpdated } from './lib/sw-update';
 import './styles.css';
 import { ToastProvider } from './ui/Toast';
+import { TransactionSheetProvider } from './ui/TransactionSheet';
+
+keepAppUpdated();
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -20,7 +24,9 @@ createRoot(document.getElementById('root')!).render(
       <PrivacyProvider>
         <ToastProvider>
           <BrowserRouter>
-            <App />
+            <TransactionSheetProvider>
+              <App />
+            </TransactionSheetProvider>
           </BrowserRouter>
         </ToastProvider>
       </PrivacyProvider>
