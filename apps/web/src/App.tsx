@@ -8,6 +8,7 @@ import { Analysis } from './screens/Analysis';
 import { Bills } from './screens/Bills';
 import { Budgets } from './screens/Budgets';
 import { Cards } from './screens/Cards';
+import { Categories } from './screens/Categories';
 import { Connections } from './screens/Connections';
 import { Home } from './screens/Home';
 import { InstallGuide } from './screens/InstallGuide';
@@ -122,6 +123,7 @@ export function App() {
         <Route path="/ajustes/notificacoes" element={<NotificationSettings />} />
         <Route path="/ajustes/conexoes" element={<Connections />} />
         <Route path="/ajustes/regras" element={<Rules />} />
+        <Route path="/ajustes/categorias" element={<Categories />} />
         <Route path="*" element={<Home />} />
       </Routes>
       <Dock />

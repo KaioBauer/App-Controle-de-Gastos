@@ -166,6 +166,24 @@ export function useGoalAction() {
   });
 }
 
+export function useCategoryAction() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (
+      a:
+        | { type: 'create'; name: string; icon: string; kind: 'EXPENSE' | 'INCOME' }
+        | { type: 'update'; id: string; name: string; icon: string }
+        | { type: 'delete'; id: string },
+    ): Promise<{ uncategorized?: number }> => {
+      if (a.type === 'create') return api('/categories', { method: 'POST', body: { name: a.name, icon: a.icon, kind: a.kind } });
+      if (a.type === 'update') return api(`/categories/${a.id}`, { method: 'PATCH', body: { name: a.name, icon: a.icon } });
+      return api(`/categories/${a.id}`, { method: 'DELETE' });
+    },
+    // Nome/ícone aparecem em quase todas as telas
+    onSuccess: () => qc.invalidateQueries(),
+  });
+}
+
 export const useRules = () => useQuery({ queryKey: ['rules'], queryFn: () => api<RuleDTO[]>('/rules') });
 
 /** Atualiza o número no ícone depois de revisar transações. */

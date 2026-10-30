@@ -55,7 +55,7 @@ export async function financeRoutes(app: FastifyInstance) {
   app.get('/summary', async (): Promise<SummaryDTO> => {
     const today = localDate(new Date());
     const month = today.slice(0, 7);
-    const [balance, txs, budgets, recent] = await Promise.all([
+    const [balance, txs, budgets, recent, investments] = await Promise.all([
       balanceCents(),
       flowTxs(`${month}-01`, `${month}-31`),
       prisma.budget.findMany({ select: { categoryId: true, limitCents: true } }),
@@ -66,6 +66,7 @@ export async function financeRoutes(app: FastifyInstance) {
         orderBy: [{ localDate: 'desc' }, { date: 'desc' }],
         take: 6,
       }),
+      prisma.investment.aggregate({ _sum: { balanceCents: true } }),
     ]);
     const budgeted = new Set(budgets.map((b) => b.categoryId));
     return {
@@ -76,6 +77,7 @@ export async function financeRoutes(app: FastifyInstance) {
       budgetTotalCents: budgets.reduce((s, b) => s + Number(b.limitCents), 0),
       budgetSpentCents: Math.max(0, sumSpending(txs.filter((t) => t.categoryId && budgeted.has(t.categoryId)))),
       recent: recent.map(toTransactionDTO),
+      investmentsCents: Number(investments._sum.balanceCents ?? 0n),
     };
   });
 

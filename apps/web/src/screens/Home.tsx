@@ -123,6 +123,13 @@ export function Home() {
         </div>
       </div>
 
+      {!!data?.investmentsCents && (
+        <div className="card between fu" style={{ animationDelay: '180ms' }}>
+          <span className="small muted">Investimentos</span>
+          <Money cents={data.investmentsCents} style={{ fontSize: 18, fontWeight: 600 }} />
+        </div>
+      )}
+
       <div className="section-title fu" style={{ animationDelay: '200ms' }}>
         <h2 className="h2">Próximas contas</h2>
         <Link to="/contas" className="link">

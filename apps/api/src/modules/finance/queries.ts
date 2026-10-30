@@ -8,7 +8,7 @@ type TxWithRelations = Transaction & { category: Category | null; account: Pick<
 export const txInclude = { category: true, account: { select: { name: true, type: true } } } satisfies Prisma.TransactionInclude;
 
 export function toCategoryDTO(c: Category): CategoryDTO {
-  return { id: c.id, name: c.name, icon: c.icon, kind: c.kind };
+  return { id: c.id, name: c.name, icon: c.icon, kind: c.kind, isDefault: c.isDefault };
 }
 
 export function toTransactionDTO(t: TxWithRelations): TransactionDTO {

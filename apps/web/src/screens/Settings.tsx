@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Bell, ChevronRight, EyeOff, Landmark, LogOut, Wand2 } from 'lucide-react';
+import { Bell, CalendarClock, ChevronRight, EyeOff, Landmark, LogOut, Shapes, Wand2 } from 'lucide-react';
 import { Link } from 'react-router';
 import { api, clearOfflineData } from '../lib/api';
 import { setBadge } from '../lib/platform';
@@ -52,6 +52,26 @@ export function Settings() {
       </div>
 
       <div className="list fu" style={{ animationDelay: '90ms' }}>
+        <Link to="/ajustes/categorias" className="item">
+          <span className="tile">
+            <Shapes size={20} strokeWidth={1.8} aria-hidden="true" />
+          </span>
+          <span className="item-main">
+            <span className="item-title">Categorias</span>
+            <span className="item-sub">Nomes, ícones e categorias suas</span>
+          </span>
+          <ChevronRight className="item-chevron" size={20} aria-hidden="true" />
+        </Link>
+        <Link to="/contas" className="item">
+          <span className="tile">
+            <CalendarClock size={20} strokeWidth={1.8} aria-hidden="true" />
+          </span>
+          <span className="item-main">
+            <span className="item-title">Contas a pagar</span>
+            <span className="item-sub">Vencimentos e pagamentos recorrentes</span>
+          </span>
+          <ChevronRight className="item-chevron" size={20} aria-hidden="true" />
+        </Link>
         <Link to="/ajustes/regras" className="item">
           <span className="tile">
             <Wand2 size={20} strokeWidth={1.8} aria-hidden="true" />

@@ -7,6 +7,8 @@ export interface CategoryDTO {
   name: string;
   icon: string;
   kind: CategoryKind;
+  /** Padrão do app (usada no mapeamento da Pluggy): pode renomear, não excluir */
+  isDefault?: boolean;
 }
 
 export interface TransactionDTO {
@@ -61,6 +63,8 @@ export interface SummaryDTO {
   /** Gasto do mês só nas categorias orçadas (comparável ao limite) */
   budgetSpentCents: number;
   recent: TransactionDTO[];
+  /** Saldo dos investimentos sincronizados (0 se não houver) */
+  investmentsCents: number;
 }
 
 export type Period = 'week' | 'month' | 'year';
