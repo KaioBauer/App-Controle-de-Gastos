@@ -2,6 +2,7 @@ import { buildApp } from './app';
 import { loadEnv } from './env';
 import { startScheduler } from './jobs/scheduler';
 import { prisma } from './lib/db';
+import { autoPayBills } from './modules/finance/bills';
 import { ensureDefaults } from './modules/finance/defaults';
 import { Notifier } from './modules/notifications/service';
 import { PluggyClient } from './modules/pluggy/client';
@@ -17,7 +18,11 @@ if (!pluggy) app.log.warn('Pluggy desativada: defina PLUGGY_CLIENT_ID e PLUGGY_C
 
 // Notificações: avaliadas ao fim de cada sync e nos horários agendados
 const notifier = new Notifier(createWebPushSender(env), app.log);
-onSyncFinished((result) => notifier.afterSync(result));
+onSyncFinished(async (result) => {
+  // Baixa automática das contas antes dos avisos (uma conta já paga não deve avisar vencimento)
+  await autoPayBills();
+  await notifier.afterSync(result);
+});
 const stopScheduler = startScheduler(pluggy, notifier, app.log);
 
 const shutdown = async () => {

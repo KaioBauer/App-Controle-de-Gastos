@@ -17,7 +17,7 @@ import {
 } from '../../domain/notifications';
 import { incomeOf, spendingByCategory, spendingOf, sumSpending } from '../../domain/spending';
 import { prisma } from '../../lib/db';
-import { buildCards } from '../finance/cards';
+import { loadBills } from '../finance/bills';
 import { flowTxs, unreviewedCount } from '../finance/queries';
 import { loadBudgets } from '../finance/routes';
 import { sendToAll, type Sender } from '../push/service';
@@ -128,18 +128,19 @@ export class Notifier {
     await this.notify(notices);
   }
 
-  /** Todo dia de manhã: faturas/contas vencendo e consentimentos expirando. */
+  /** Todo dia de manhã: contas e faturas vencendo e consentimentos expirando. */
   async daily() {
     const today = localDate(new Date());
-    const { cards } = await buildCards(today);
-    const dues = cards
-      .filter((c) => c.openBill.dueDate)
-      .map((c) => ({
-        key: c.accountId,
-        name: `Fatura do ${c.name}`,
-        amountCents: c.openBill.totalCents > 0 ? c.openBill.totalCents : null,
-        dueDate: c.openBill.dueDate!,
-        url: '/cartoes',
+    const { upcoming } = await loadBills(today);
+    const dues = upcoming
+      .filter((u) => u.status !== 'paid')
+      .map((u) => ({
+        // Uma chave por conta e vencimento: avisos de meses diferentes não se confundem
+        key: u.key,
+        name: u.name,
+        amountCents: u.amountCents,
+        dueDate: u.dueDate,
+        url: u.kind === 'card' ? '/cartoes' : '/contas',
       }));
     await this.notify([...dueNotices(dues, today), ...(await this.connectionNotices(today))]);
   }

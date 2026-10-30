@@ -5,6 +5,7 @@ import { api, ApiError } from './lib/api';
 import { isIOS, isStandalone, setBadge } from './lib/platform';
 import { syncSubscription } from './lib/push';
 import { Analysis } from './screens/Analysis';
+import { Bills } from './screens/Bills';
 import { Budgets } from './screens/Budgets';
 import { Cards } from './screens/Cards';
 import { Connections } from './screens/Connections';
@@ -116,6 +117,7 @@ export function App() {
         <Route path="/analise" element={<Analysis />} />
         <Route path="/orcamentos" element={<Budgets />} />
         <Route path="/transacoes" element={<Transactions />} />
+        <Route path="/contas" element={<Bills />} />
         <Route path="/ajustes" element={<Settings />} />
         <Route path="/ajustes/notificacoes" element={<NotificationSettings />} />
         <Route path="/ajustes/conexoes" element={<Connections />} />

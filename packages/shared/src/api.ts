@@ -136,6 +136,48 @@ export interface ConnectionsDTO {
   connections: ConnectionDTO[];
 }
 
+export type BillStatus = 'pending' | 'overdue' | 'paid';
+
+export interface BillDTO {
+  id: string;
+  name: string;
+  /** null quando o valor varia (ex.: luz) */
+  amountCents: number | null;
+  dueDay: number | null;
+  dueDate: string | null;
+  category: CategoryDTO | null;
+  /** Dá baixa sozinha quando o pagamento aparece no extrato */
+  autoMatch: boolean;
+  occurrence: { period: string; dueDate: string; status: BillStatus } | null;
+}
+
+export interface BillSuggestionDTO {
+  matchKey: string;
+  name: string;
+  amountCents: number;
+  dueDay: number;
+  category: CategoryDTO | null;
+}
+
+export interface UpcomingDTO {
+  /** "bill:<id>" ou "card:<accountId>" */
+  key: string;
+  kind: 'bill' | 'card';
+  name: string;
+  amountCents: number | null;
+  dueDate: string;
+  status: BillStatus;
+  icon: string;
+  billId?: string;
+  period?: string;
+}
+
+export interface BillsDTO {
+  bills: BillDTO[];
+  suggestions: BillSuggestionDTO[];
+  upcoming: UpcomingDTO[];
+}
+
 export interface NotificationSettingsDTO {
   newTransaction: boolean;
   /** Só avisa transações a partir deste valor (0 = todas) */

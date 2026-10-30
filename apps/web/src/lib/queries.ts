@@ -1,6 +1,7 @@
 import type {
   AccountDTO,
   AnalysisDTO,
+  BillsDTO,
   BudgetsDTO,
   CardsDTO,
   CategoryDTO,
@@ -96,6 +97,39 @@ export function useSaveNotificationSettings() {
   });
 }
 
+export const useBills = () => useQuery({ queryKey: ['bills'], queryFn: () => api<BillsDTO>('/bills') });
+
+export interface BillInput {
+  name: string;
+  amountCents: number | null;
+  dueDay: number | null;
+  dueDate: string | null;
+  categoryId: string | null;
+  matchKey?: string | null;
+}
+
+export function useSaveBill() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...body }: BillInput & { id?: string }) =>
+      id ? api(`/bills/${id}`, { method: 'PATCH', body }) : api<{ id: string }>('/bills', { method: 'POST', body }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['bills'] }),
+  });
+}
+
+export function useBillAction() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (a: { type: 'pay' | 'unpay' | 'delete'; id: string; period?: string } | { type: 'dismiss'; key: string }) => {
+      if (a.type === 'dismiss') return api(`/bills/suggestions/${encodeURIComponent(a.key)}/dismiss`, { method: 'POST' });
+      if (a.type === 'pay') return api(`/bills/${a.id}/pay`, { method: 'POST', body: { period: a.period } });
+      if (a.type === 'unpay') return api(`/bills/${a.id}/pay/${a.period}`, { method: 'DELETE' });
+      return api(`/bills/${a.id}`, { method: 'DELETE' });
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['bills'] }),
+  });
+}
+
 export const useRules = () => useQuery({ queryKey: ['rules'], queryFn: () => api<RuleDTO[]>('/rules') });
 
 /** Atualiza o número no ícone depois de revisar transações. */
@@ -112,7 +146,7 @@ function useInvalidateFinance() {
   const qc = useQueryClient();
   return () => {
     void Promise.all([
-      ...['summary', 'analysis', 'budgets', 'transactions', 'cards', 'bill', 'similar', 'rules', 'badge'].map((key) =>
+      ...['summary', 'analysis', 'budgets', 'transactions', 'cards', 'bill', 'bills', 'similar', 'rules', 'badge'].map((key) =>
         qc.invalidateQueries({ queryKey: [key] }),
       ),
       refreshBadge(),

@@ -3,7 +3,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useRef } from 'react';
 import { Link } from 'react-router';
 import { Money, useCountUp, usePrivacy } from '../lib/privacy';
-import { useSummary, useUnreviewedCount } from '../lib/queries';
+import { useBills, useSummary, useUnreviewedCount } from '../lib/queries';
+import { UpcomingRow } from './Bills';
 import { OfflineBanner, relativeDay, TxRow } from '../ui/common';
 
 function greeting(now: Date) {
@@ -20,6 +21,8 @@ export function Home() {
   const { hidden, toggle } = usePrivacy();
   const { data, error } = useSummary();
   const unreviewed = useUnreviewedCount().data?.count ?? 0;
+  const bills = useBills();
+  const upcoming = bills.data?.upcoming ?? [];
   const balance = useCountUp(data?.balanceCents ?? 0);
 
   // Destaca linhas que surgiram depois do primeiro carregamento (ex.: gasto recém-lançado)
@@ -119,6 +122,26 @@ export function Home() {
           />
         </div>
       </div>
+
+      <div className="section-title fu" style={{ animationDelay: '200ms' }}>
+        <h2 className="h2">Próximas contas</h2>
+        <Link to="/contas" className="link">
+          {upcoming.length ? 'Ver todas' : 'Organizar'}
+        </Link>
+      </div>
+      {upcoming.length > 0 ? (
+        <div className="list fu" style={{ animationDelay: '210ms' }}>
+          {upcoming.slice(0, 3).map((u) => (
+            <UpcomingRow key={u.key} u={u} />
+          ))}
+        </div>
+      ) : (
+        <Link to="/contas" className="card small muted fu" style={{ animationDelay: '210ms' }}>
+          {bills.data?.suggestions.length
+            ? `Encontramos ${bills.data.suggestions.length} ${bills.data.suggestions.length === 1 ? 'pagamento recorrente' : 'pagamentos recorrentes'}. Toque para transformar em contas com aviso de vencimento.`
+            : 'Cadastre aluguel, internet e outras contas para ser avisado antes do vencimento.'}
+        </Link>
+      )}
 
       <div className="section-title fu" style={{ animationDelay: '220ms' }}>
         <h2 className="h2">Movimentações</h2>

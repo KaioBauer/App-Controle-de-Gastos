@@ -60,6 +60,7 @@ model Category {
   transactions Transaction[]
   budget       Budget?
   rules        CategoryRule[]
+  bills        Bill[]
 }
 
 // "Sempre categorizar <estabelecimento> como <categoria>": vale para o sync da Pluggy
@@ -147,6 +148,44 @@ model Investment {
   subtype      String?
   balanceCents BigInt
   updatedAt    DateTime   @updatedAt
+}
+
+// Conta a pagar: mensal (dueDay) ou única (dueDate)
+model Bill {
+  id          String        @id @default(uuid())
+  name        String
+  // Valor esperado; null quando varia (ex.: luz)
+  amountCents BigInt?
+  // Mensal: dia do vencimento (1–31, limitado ao fim do mês)
+  dueDay      Int?
+  // Única: data do vencimento (YYYY-MM-DD)
+  dueDate     String?
+  categoryId  String?
+  category    Category?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  // Estabelecimento do pagamento no extrato: dá baixa automática (ver domain/merchant.ts)
+  matchKey    String?
+  active      Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  payments    BillPayment[]
+}
+
+// Pagamento de uma ocorrência (mês) de uma conta
+model BillPayment {
+  id            String   @id @default(uuid())
+  billId        String
+  bill          Bill     @relation(fields: [billId], references: [id], onDelete: Cascade)
+  // "YYYY-MM" da ocorrência paga
+  period        String
+  paidAt        DateTime @default(now())
+  transactionId String?
+
+  @@unique([billId, period])
+}
+
+// Sugestões de conta recorrente que o usuário dispensou
+model DismissedSuggestion {
+  matchKey  String   @id
+  createdAt DateTime @default(now())
 }
 
 // Idempotência dos webhooks (a Pluggy pode reenviar o mesmo evento)
