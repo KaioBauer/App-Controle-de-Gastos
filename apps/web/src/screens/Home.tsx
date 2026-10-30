@@ -141,6 +141,12 @@ export function Home() {
           {upcoming.slice(0, 3).map((u) => (
             <UpcomingRow key={u.key} u={u} />
           ))}
+          <div className="between" style={{ padding: '10px 12px 8px', borderTop: '1px solid var(--fill)' }}>
+            <span className="small muted">
+              Total a pagar{upcoming.length > 3 ? ` (${upcoming.length} contas)` : ''}
+            </span>
+            <Money cents={upcoming.reduce((s, u) => s + (u.amountCents ?? 0), 0)} className="num" style={{ fontWeight: 600 }} />
+          </div>
         </div>
       ) : (
         <Link to="/contas" className="card small muted fu" style={{ animationDelay: '210ms' }}>

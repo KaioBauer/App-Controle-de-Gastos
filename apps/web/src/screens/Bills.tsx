@@ -47,6 +47,31 @@ export function UpcomingRow({ u, onClick }: { u: UpcomingDTO; onClick?: () => vo
   );
 }
 
+/** Soma do que falta pagar (contas em aberto + faturas dos cartões). */
+function UpcomingTotal({ upcoming }: { upcoming: UpcomingDTO[] }) {
+  const total = upcoming.reduce((s, u) => s + (u.amountCents ?? 0), 0);
+  const overdue = upcoming.filter((u) => u.status === 'overdue').reduce((s, u) => s + (u.amountCents ?? 0), 0);
+  const varying = upcoming.filter((u) => u.amountCents == null).length;
+  return (
+    <section className="card-lg stack fu" style={{ gap: 6 }} aria-label="Total a pagar">
+      <span className="small muted">Total a pagar</span>
+      <Money cents={total} className="num" style={{ fontSize: 32, fontWeight: 600, lineHeight: 1.1 }} />
+      <span className="small muted">
+        {upcoming.length} {upcoming.length === 1 ? 'conta' : 'contas'} em aberto
+        {overdue > 0 && (
+          <>
+            {' · '}
+            <span style={{ color: 'var(--danger)' }}>
+              <Money cents={overdue} /> vencido
+            </span>
+          </>
+        )}
+        {varying > 0 && ` · ${varying} com valor variável fora da soma`}
+      </span>
+    </section>
+  );
+}
+
 export function Bills() {
   const { data, error } = useBills();
   const formSheet = useSheet();
@@ -72,6 +97,8 @@ export function Bills() {
       <PageHeader title="Contas" back="/" subtitle="Contas a pagar e pagamentos recorrentes" />
       <OfflineBanner />
       {error && !data && <p className="muted">Não foi possível carregar. {error.message}</p>}
+
+      {data && data.upcoming.length > 0 && <UpcomingTotal upcoming={data.upcoming} />}
 
       {data && data.upcoming.length > 0 && (
         <section className="stack" style={{ gap: 10 }}>
