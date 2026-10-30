@@ -1,24 +1,35 @@
 import type { FastifyBaseLogger } from 'fastify';
 import cron, { type ScheduledTask } from 'node-cron';
+import type { Notifier } from '../modules/notifications/service';
 import type { PluggyClient } from '../modules/pluggy/client';
 import { syncAll } from '../modules/pluggy/sync';
 
-/** Jobs agendados (fuso de São Paulo). Só uma instância da API roda, então não há disputa. */
-export function startScheduler(client: PluggyClient | null, log: FastifyBaseLogger) {
-  const tasks: ScheduledTask[] = [];
+const TZ = 'America/Sao_Paulo';
 
-  if (client) {
-    // Rede de segurança caso algum webhook da Pluggy se perca
+/** Jobs agendados (fuso de São Paulo). Só uma instância da API roda, então não há disputa. */
+export function startScheduler(client: PluggyClient | null, notifier: Notifier, log: FastifyBaseLogger) {
+  const tasks: ScheduledTask[] = [];
+  const every = (expr: string, name: string, fn: () => Promise<unknown>) =>
     tasks.push(
       cron.schedule(
-        '7 * * * *',
+        expr,
         () => {
-          syncAll(client, log).catch((err) => log.error({ err }, 'Sync agendado da Pluggy falhou'));
+          fn().catch((err) => log.error({ err, job: name }, 'Job agendado falhou'));
         },
-        { timezone: 'America/Sao_Paulo', name: 'pluggy-sync' },
+        { timezone: TZ, name },
       ),
     );
-  }
+
+  // Rede de segurança caso algum webhook da Pluggy se perca
+  if (client) every('7 * * * *', 'pluggy-sync', () => syncAll(client, log));
+
+  // Envia o que ficou na fila durante o horário de silêncio
+  every('*/15 * * * *', 'notifications-dispatch', () => notifier.dispatch());
+  // Faturas/contas vencendo e consentimento expirando
+  every('0 9 * * *', 'notifications-daily', () => notifier.daily());
+  // Resumo semanal no domingo à noite e fechamento do mês no dia 1º
+  every('0 20 * * 0', 'notifications-weekly', () => notifier.weekly());
+  every('0 9 1 * *', 'notifications-monthly', () => notifier.monthly());
 
   return () => tasks.forEach((t) => t.stop());
 }

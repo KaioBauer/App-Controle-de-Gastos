@@ -7,6 +7,7 @@ import { authRoutes } from './modules/auth/routes';
 import { cardRoutes } from './modules/finance/cards';
 import { financeRoutes } from './modules/finance/routes';
 import { transactionRoutes } from './modules/finance/transactions';
+import { notificationRoutes } from './modules/notifications/routes';
 import type { PluggyClient } from './modules/pluggy/client';
 import { pluggyRoutes } from './modules/pluggy/routes';
 import { pushRoutes } from './modules/push/routes';
@@ -41,6 +42,7 @@ export async function buildApp(env: Env, pluggy: PluggyClient | null) {
       await api.register(financeRoutes);
       await api.register(cardRoutes);
       await api.register(transactionRoutes);
+      await api.register(notificationRoutes);
       await api.register(pluggyRoutes, { env, client: pluggy });
     },
     { prefix: '/api' },

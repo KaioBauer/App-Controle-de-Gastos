@@ -93,13 +93,30 @@ async function doSync(client: PluggyClient, itemId: string, log: FastifyBaseLogg
 
     await prisma.pluggyItem.update({ where: { id: itemId }, data: { lastSyncAt: new Date(), lastSyncError: null } });
     log.info({ ...result, newTransactionIds: result.newTransactionIds.length }, 'Sync da Pluggy concluído');
+    await runHooks(result, log);
     return result;
   } catch (err) {
     await prisma.pluggyItem.update({
       where: { id: itemId },
       data: { lastSyncError: String((err as Error).message ?? err).slice(0, 500) },
     });
+    await runHooks({ ...result, failed: true }, log);
     throw err;
+  }
+}
+
+export type SyncHook = (result: SyncResult & { failed?: boolean }) => Promise<void>;
+const hooks: SyncHook[] = [];
+
+/** Registra quem reage ao fim de cada sync (ex.: notificações), sem acoplar este módulo a eles. */
+export function onSyncFinished(hook: SyncHook) {
+  hooks.push(hook);
+}
+
+async function runHooks(result: SyncResult & { failed?: boolean }, log: FastifyBaseLogger) {
+  for (const hook of hooks) {
+    // Um aviso que falha não pode derrubar o sync
+    await hook(result).catch((err) => log.error({ err }, 'Falha ao processar o fim do sync'));
   }
 }
 

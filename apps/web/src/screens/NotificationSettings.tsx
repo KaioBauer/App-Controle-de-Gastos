@@ -5,6 +5,7 @@ import { api } from '../lib/api';
 import { isIOS, isStandalone } from '../lib/platform';
 import { getPushState, preparePush, subscribePush, unsubscribePush, type PushState } from '../lib/push';
 import { PageHeader } from '../ui/common';
+import { NotificationPrefs } from './NotificationPrefs';
 
 const STATE_LABEL: Record<PushState, string> = {
   unsupported: 'Não suportado',
@@ -199,7 +200,7 @@ export function NotificationSettings() {
         </section>
       )}
 
-      <Note>Tipos de notificação, valor mínimo e horário de silêncio chegam na etapa de notificações.</Note>
+      <NotificationPrefs />
     </main>
   );
 }

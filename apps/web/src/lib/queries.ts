@@ -5,6 +5,7 @@ import type {
   CardsDTO,
   CategoryDTO,
   ConnectionsDTO,
+  NotificationSettingsDTO,
   Period,
   RuleDTO,
   SummaryDTO,
@@ -75,6 +76,25 @@ export const useSimilar = (id: string | null) =>
 
 export const useUnreviewedCount = () =>
   useQuery({ queryKey: ['badge'], queryFn: () => api<{ count: number }>('/badge') });
+
+export const useNotificationSettings = () =>
+  useQuery({ queryKey: ['notification-settings'], queryFn: () => api<NotificationSettingsDTO>('/settings/notifications') });
+
+export function useSaveNotificationSettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: NotificationSettingsDTO) => api<NotificationSettingsDTO>('/settings/notifications', { method: 'PUT', body }),
+    // Atualiza na hora (os switches respondem sem esperar o servidor) e desfaz se falhar
+    onMutate: async (next) => {
+      await qc.cancelQueries({ queryKey: ['notification-settings'] });
+      const previous = qc.getQueryData<NotificationSettingsDTO>(['notification-settings']);
+      qc.setQueryData(['notification-settings'], next);
+      return { previous };
+    },
+    onError: (_e, _v, ctx) => ctx?.previous && qc.setQueryData(['notification-settings'], ctx.previous),
+    onSuccess: (saved) => qc.setQueryData(['notification-settings'], saved),
+  });
+}
 
 export const useRules = () => useQuery({ queryKey: ['rules'], queryFn: () => api<RuleDTO[]>('/rules') });
 

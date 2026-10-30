@@ -136,6 +136,23 @@ export interface ConnectionsDTO {
   connections: ConnectionDTO[];
 }
 
+export interface NotificationSettingsDTO {
+  newTransaction: boolean;
+  /** Só avisa transações a partir deste valor (0 = todas) */
+  newTransactionMinCents: number;
+  budget: boolean;
+  billsDue: boolean;
+  lowBalance: boolean;
+  lowBalanceCents: number;
+  unusualSpending: boolean;
+  weeklySummary: boolean;
+  monthlySummary: boolean;
+  syncErrors: boolean;
+  /** "HH:MM" no fuso de São Paulo; null = sem horário de silêncio */
+  quietStart: string | null;
+  quietEnd: string | null;
+}
+
 export type BudgetStatus = 'ok' | 'warn' | 'full' | 'over';
 
 export interface BudgetDTO {

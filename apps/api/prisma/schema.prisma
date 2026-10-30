@@ -225,6 +225,23 @@ model NotificationSettings {
   weeklySummary     Boolean @default(true)
   monthlySummary    Boolean @default(true)
   syncErrors        Boolean @default(true)
+  // Avisa quando o saldo de uma conta bancária fica abaixo deste valor (centavos)
+  lowBalanceCents   BigInt  @default(10000)
   quietStart        String? // "22:00"
   quietEnd          String? // "07:00"
+}
+
+// Fila de notificações: cada aviso é gerado uma única vez (dedupeKey) e enviado fora do
+// horário de silêncio. sentAt nulo = ainda na fila.
+model NotificationOutbox {
+  id        String    @id @default(uuid())
+  dedupeKey String    @unique
+  type      String
+  title     String
+  body      String
+  url       String
+  createdAt DateTime  @default(now())
+  sentAt    DateTime?
+
+  @@index([sentAt])
 }

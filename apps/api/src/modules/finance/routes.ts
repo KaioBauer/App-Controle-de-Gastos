@@ -10,6 +10,40 @@ import { balanceCents, flowTxs, toCategoryDTO, toTransactionDTO, txInclude } fro
 
 const MAX_CENTS = 99_999_999_99;
 
+/** Orçamentos do mês com progresso e projeção (tela de Orçamentos e notificações). */
+export async function loadBudgets(today = localDate(new Date())): Promise<BudgetsDTO> {
+  const month = today.slice(0, 7);
+  const last = `${month}-${String(daysInMonth(month)).padStart(2, '0')}`;
+  const [budgets, txs, expenseCats] = await Promise.all([
+    prisma.budget.findMany({ include: { category: true } }),
+    flowTxs(`${month}-01`, last),
+    prisma.category.findMany({ where: { kind: 'EXPENSE' }, orderBy: { sortOrder: 'asc' } }),
+  ]);
+  const spent = spendingByCategory(txs);
+  const items = budgets
+    .map((b) => {
+      const limitCents = Number(b.limitCents);
+      const spentCents = Math.max(0, spent.get(b.categoryId) ?? 0);
+      return {
+        categoryId: b.categoryId,
+        name: b.category.name,
+        icon: b.category.icon,
+        limitCents,
+        spentCents,
+        ...budgetProgress(limitCents, spentCents, today),
+      };
+    })
+    .sort((a, b) => b.pct - a.pct);
+  const withBudget = new Set(budgets.map((b) => b.categoryId));
+  return {
+    month,
+    totalLimitCents: items.reduce((s, b) => s + b.limitCents, 0),
+    totalSpentCents: items.reduce((s, b) => s + b.spentCents, 0),
+    budgets: items,
+    available: expenseCats.filter((c) => !withBudget.has(c.id)).map(toCategoryDTO),
+  };
+}
+
 export async function financeRoutes(app: FastifyInstance) {
   app.addHook('preHandler', requireAuth);
 
@@ -61,39 +95,7 @@ export async function financeRoutes(app: FastifyInstance) {
     });
   });
 
-  app.get('/budgets', async (): Promise<BudgetsDTO> => {
-    const today = localDate(new Date());
-    const month = today.slice(0, 7);
-    const last = `${month}-${String(daysInMonth(month)).padStart(2, '0')}`;
-    const [budgets, txs, expenseCats] = await Promise.all([
-      prisma.budget.findMany({ include: { category: true } }),
-      flowTxs(`${month}-01`, last),
-      prisma.category.findMany({ where: { kind: 'EXPENSE' }, orderBy: { sortOrder: 'asc' } }),
-    ]);
-    const spent = spendingByCategory(txs);
-    const items = budgets
-      .map((b) => {
-        const limitCents = Number(b.limitCents);
-        const spentCents = Math.max(0, spent.get(b.categoryId) ?? 0);
-        return {
-          categoryId: b.categoryId,
-          name: b.category.name,
-          icon: b.category.icon,
-          limitCents,
-          spentCents,
-          ...budgetProgress(limitCents, spentCents, today),
-        };
-      })
-      .sort((a, b) => b.pct - a.pct);
-    const withBudget = new Set(budgets.map((b) => b.categoryId));
-    return {
-      month,
-      totalLimitCents: items.reduce((s, b) => s + b.limitCents, 0),
-      totalSpentCents: items.reduce((s, b) => s + b.spentCents, 0),
-      budgets: items,
-      available: expenseCats.filter((c) => !withBudget.has(c.id)).map(toCategoryDTO),
-    };
-  });
+  app.get('/budgets', () => loadBudgets());
 
   app.put('/budgets/:categoryId', async (request, reply) => {
     const { categoryId } = request.params as { categoryId: string };
