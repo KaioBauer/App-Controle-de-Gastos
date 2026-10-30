@@ -2,6 +2,7 @@ import type { BillDTO, BillStatus, BillSuggestionDTO, UpcomingDTO } from '@finan
 import { formatAmount, localDate, toCents } from '@financas/shared';
 import { Check, Plus, Sparkles } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
+import { Link } from 'react-router';
 import { Money } from '../lib/privacy';
 import { useBillAction, useBills, useCategories, useSaveBill, type BillInput } from '../lib/queries';
 import { OfflineBanner, PageHeader } from '../ui/common';
@@ -22,7 +23,7 @@ export function dueLabel(dueDate: string, status: BillStatus, today = localDate(
   return days === -1 ? 'venceu ontem' : `venceu há ${-days} dias`;
 }
 
-export function UpcomingRow({ u, onClick }: { u: UpcomingDTO; onClick?: () => void }) {
+export function UpcomingRow({ u, onClick, to }: { u: UpcomingDTO; onClick?: () => void; to?: string }) {
   const late = u.status === 'overdue';
   const content = (
     <>
@@ -38,6 +39,13 @@ export function UpcomingRow({ u, onClick }: { u: UpcomingDTO; onClick?: () => vo
       {u.amountCents != null ? <Money cents={u.amountCents} className="item-amt" /> : <span className="small muted">valor varia</span>}
     </>
   );
+  if (to) {
+    return (
+      <Link to={to} className="item">
+        {content}
+      </Link>
+    );
+  }
   return onClick ? (
     <button type="button" className="item" onClick={onClick}>
       {content}
@@ -108,6 +116,7 @@ export function Bills() {
               <UpcomingRow
                 key={u.key}
                 u={u}
+                to={u.kind === 'card' ? '/cartoes' : undefined}
                 onClick={
                   u.kind === 'bill'
                     ? () => {

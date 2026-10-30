@@ -1,5 +1,6 @@
 import { addDays, localDate, localMinutes, monthName } from '@financas/shared';
 import { useQueryClient } from '@tanstack/react-query';
+import { ChevronRight } from 'lucide-react';
 import { useRef } from 'react';
 import { Link } from 'react-router';
 import { Money, useCountUp, usePrivacy } from '../lib/privacy';
@@ -80,10 +81,13 @@ export function Home() {
           <Money cents={balance} splitSymbol symbolStyle={{ fontSize: 22, color: 'var(--hero-ink-2)' }} />
         </button>
         <div className="stack" style={{ gap: 10 }}>
-          <div className="between small">
+          <Link to="/transacoes?type=expense&period=month" className="between small press" style={{ color: 'inherit' }}>
             <span className="muted">Gasto do mês</span>
-            <Money cents={spent} />
-          </div>
+            <span className="row" style={{ gap: 2 }}>
+              <Money cents={spent} />
+              <ChevronRight size={14} aria-hidden="true" style={{ opacity: 0.6 }} />
+            </span>
+          </Link>
           {budget > 0 ? (
             <>
               <div
@@ -109,18 +113,18 @@ export function Home() {
       </section>
 
       <div className="fu" style={{ animationDelay: '160ms', display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
-        <div className="card stack" style={{ gap: 6 }}>
+        <Link to="/transacoes?type=income&period=month" className="card stack press" style={{ gap: 6 }}>
           <span className="small muted">Entradas</span>
           <Money cents={data?.monthIncomeCents ?? 0} style={{ fontSize: 20, fontWeight: 600 }} />
-        </div>
-        <div className="card stack" style={{ gap: 6 }}>
+        </Link>
+        <Link to={budget > 0 ? '/orcamentos' : '/analise'} className="card stack press" style={{ gap: 6 }}>
           <span className="small muted">{budget > 0 ? 'Restante' : 'Saldo do mês'}</span>
           <Money
             cents={budget > 0 ? Math.max(0, budget - budgetSpent) : (data?.monthIncomeCents ?? 0) - spent}
             sign={budget > 0 ? 'none' : 'auto'}
             style={{ fontSize: 20, fontWeight: 600 }}
           />
-        </div>
+        </Link>
       </div>
 
       {!!data?.investmentsCents && (
@@ -139,7 +143,7 @@ export function Home() {
       {upcoming.length > 0 ? (
         <div className="list fu" style={{ animationDelay: '210ms' }}>
           {upcoming.slice(0, 3).map((u) => (
-            <UpcomingRow key={u.key} u={u} />
+            <UpcomingRow key={u.key} u={u} to={u.kind === 'card' ? '/cartoes' : '/contas'} />
           ))}
           <div className="between" style={{ padding: '10px 12px 8px', borderTop: '1px solid var(--fill)' }}>
             <span className="small muted">

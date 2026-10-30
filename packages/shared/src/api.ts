@@ -78,7 +78,11 @@ export interface AnalysisDTO {
   deltaPct: number | null;
   /** Rótulo do período anterior ("anterior", "setembro", "2025") */
   previousName: string;
-  bars: { label: string; name: string; cents: number }[];
+  /** Dias do período atual (para abrir as transações) */
+  start: string;
+  end: string;
+  /** from/to: dias que a barra cobre */
+  bars: { label: string; name: string; cents: number; from: string; to: string }[];
   categories: { id: string; name: string; icon: string; cents: number }[];
   insight: { title: string; body: string } | null;
 }

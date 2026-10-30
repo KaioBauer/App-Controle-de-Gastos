@@ -1,7 +1,8 @@
 import type { CardDTO } from '@financas/shared';
 import { addDays, localDate } from '@financas/shared';
-import { ChevronRight, CreditCard } from 'lucide-react';
+import { ChevronRight, CreditCard, X } from 'lucide-react';
 import { useState } from 'react';
+import { Link } from 'react-router';
 import { Money, useCountUp } from '../lib/privacy';
 import { useBillTransactions, useCards } from '../lib/queries';
 import { Bars, Donut } from '../ui/charts';
@@ -21,9 +22,9 @@ const fmtDay = (ymd: string) => clean(shortDate.format(d(ymd)));
 /** "jun/27" */
 const fmtMonthYear = (ymd: string) => clean(monthYear.format(d(ymd)));
 
-function SectionTitle({ title, right }: { title: string; right?: React.ReactNode }) {
+function SectionTitle({ id, title, right }: { id?: string; title: string; right?: React.ReactNode }) {
   return (
-    <div className="section-title">
+    <div id={id} className="section-title" style={{ scrollMarginTop: 16 }}>
       <h2 className="h2">{title}</h2>
       {right && <span className="small muted">{right}</span>}
     </div>
@@ -73,6 +74,12 @@ function CardView({ card }: { card: CardDTO }) {
   const yesterday = addDays(today, -1);
   const billSheet = useSheet();
   const [billId, setBillId] = useState<{ id: string; dueDate: string; totalCents: number } | null>(null);
+  // Categoria tocada na rosca filtra as compras da fatura logo abaixo
+  const [catFilter, setCatFilter] = useState<string | null>(null);
+  const purchases = catFilter ? bill.transactions.filter((t) => (t.category?.name ?? 'Sem categoria') === catFilter) : bill.transactions;
+  const purchasesCents = purchases.reduce((sum, t) => sum - t.amountCents, 0);
+  const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const txLink = (name: string) => `/transacoes?q=${encodeURIComponent(name)}&accountId=${card.accountId}`;
 
   return (
     <>
@@ -83,7 +90,9 @@ function CardView({ card }: { card: CardDTO }) {
           </span>
           <span className="tag">Fecha {fmtDay(bill.closeDate)}</span>
         </div>
-        <Money cents={shown} splitSymbol symbolStyle={{ fontSize: 22, color: 'var(--hero-ink-2)' }} style={{ fontSize: 44, fontWeight: 600, lineHeight: 1 }} />
+        <button type="button" className="press" style={{ textAlign: 'left' }} onClick={() => scrollTo('compras-fatura')} aria-label="Ver compras da fatura">
+          <Money cents={shown} splitSymbol symbolStyle={{ fontSize: 22, color: 'var(--hero-ink-2)' }} style={{ fontSize: 44, fontWeight: 600, lineHeight: 1 }} />
+        </button>
         {bill.dueDate && (
           <span className="small muted" style={{ marginTop: -8 }}>
             Vence por volta de {fmtDay(bill.dueDate)}
@@ -114,7 +123,13 @@ function CardView({ card }: { card: CardDTO }) {
       </section>
 
       <div className="fu" style={{ animationDelay: '120ms', display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
-        <div className="card stack" style={{ gap: 6 }}>
+        <button
+          type="button"
+          className="card stack press"
+          style={{ gap: 6, textAlign: 'left' }}
+          disabled={card.recurring.length === 0}
+          onClick={() => scrollTo('despesas-fixas')}
+        >
           <span className="small muted">Despesas fixas</span>
           <span style={{ fontSize: 20, fontWeight: 600 }}>
             <Money cents={card.recurringTotalCents} />
@@ -122,11 +137,17 @@ function CardView({ card }: { card: CardDTO }) {
               /mês
             </span>
           </span>
-        </div>
-        <div className="card stack" style={{ gap: 6 }}>
+        </button>
+        <button
+          type="button"
+          className="card stack press"
+          style={{ gap: 6, textAlign: 'left' }}
+          disabled={card.installments.length === 0}
+          onClick={() => scrollTo('parcelamentos')}
+        >
           <span className="small muted">Parcelas a pagar</span>
           <Money cents={card.installmentsRemainingCents} style={{ fontSize: 20, fontWeight: 600 }} />
-        </div>
+        </button>
       </div>
 
       {card.futureBills.some((b) => b.totalCents > 0) && (
@@ -147,10 +168,10 @@ function CardView({ card }: { card: CardDTO }) {
 
       {card.recurring.length > 0 && (
         <>
-          <SectionTitle title="Despesas fixas" right={<Money cents={card.recurringTotalCents} />} />
+          <SectionTitle id="despesas-fixas" title="Despesas fixas" right={<Money cents={card.recurringTotalCents} />} />
           <div className="list fu">
             {card.recurring.map((r) => (
-              <div key={r.name} className="item">
+              <Link key={r.name} to={txLink(r.name)} className="item">
                 <div className="tile">
                   <CategoryIcon icon={r.icon} />
                 </div>
@@ -161,7 +182,7 @@ function CardView({ card }: { card: CardDTO }) {
                   </span>
                 </div>
                 <Money cents={r.amountCents} className="item-amt" />
-              </div>
+              </Link>
             ))}
           </div>
         </>
@@ -169,10 +190,10 @@ function CardView({ card }: { card: CardDTO }) {
 
       {card.installments.length > 0 && (
         <>
-          <SectionTitle title="Parcelamentos" right={<>falta <Money cents={card.installmentsRemainingCents} /></>} />
+          <SectionTitle id="parcelamentos" title="Parcelamentos" right={<>falta <Money cents={card.installmentsRemainingCents} /></>} />
           <div className="list fu">
             {card.installments.map((i) => (
-              <div key={`${i.name}-${i.lastDate}`} className="item" style={{ flexWrap: 'wrap', rowGap: 10 }}>
+              <Link key={`${i.name}-${i.lastDate}`} to={txLink(i.name)} className="item" style={{ flexWrap: 'wrap', rowGap: 10 }}>
                 <div className="tile">
                   <CategoryIcon icon={i.icon} />
                 </div>
@@ -199,7 +220,7 @@ function CardView({ card }: { card: CardDTO }) {
                 >
                   <div className="gx" style={{ width: `${(i.current / i.total) * 100}%` }} />
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         </>
@@ -211,24 +232,38 @@ function CardView({ card }: { card: CardDTO }) {
           <Donut
             items={bill.categories}
             label={`${bill.categories.length} ${bill.categories.length === 1 ? 'categoria' : 'categorias'}`}
+            selected={catFilter}
+            onSelect={(c) => {
+              setCatFilter(catFilter === c.name ? null : c.name);
+              scrollTo('compras-fatura');
+            }}
           />
         </section>
       )}
 
       <SectionTitle
+        id="compras-fatura"
         title="Compras da fatura"
         right={
           <>
-            {bill.transactions.length} {bill.transactions.length === 1 ? 'compra' : 'compras'} ·{' '}
-            <Money cents={bill.totalCents} style={{ color: 'var(--ink)', fontWeight: 600 }} />
+            {purchases.length} {purchases.length === 1 ? 'compra' : 'compras'} ·{' '}
+            <Money cents={catFilter ? purchasesCents : bill.totalCents} style={{ color: 'var(--ink)', fontWeight: 600 }} />
           </>
         }
       />
+      {catFilter && (
+        <div className="chips">
+          <button type="button" className="chip row" aria-pressed="true" style={{ gap: 6 }} onClick={() => setCatFilter(null)} aria-label={`Remover filtro ${catFilter}`}>
+            {catFilter}
+            <X size={14} aria-hidden="true" />
+          </button>
+        </div>
+      )}
       <div className="list">
-        {bill.transactions.length === 0 ? (
+        {purchases.length === 0 ? (
           <p className="empty">Nenhuma compra na fatura aberta.</p>
         ) : (
-          bill.transactions.map((t, i) => (
+          purchases.map((t, i) => (
             <TxRow
               key={t.id}
               tx={t}

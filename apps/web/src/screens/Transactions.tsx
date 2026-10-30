@@ -38,6 +38,16 @@ function periodRange(id: PeriodId, today: string): { from?: string; to?: string 
   return {};
 }
 
+const shortDay = new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+const fmtShort = (ymd: string) => shortDay.format(new Date(`${ymd}T12:00:00Z`)).replace('.', '').replace(' de ', ' ');
+
+/** "29 out", "1–7 out", "a partir de 1 out" */
+function rangeLabel(from?: string, to?: string) {
+  if (from && to) return from === to ? fmtShort(from) : `${fmtShort(from)} – ${fmtShort(to)}`;
+  if (from) return `desde ${fmtShort(from)}`;
+  return `até ${fmtShort(to!)}`;
+}
+
 function groupByDay(items: TransactionDTO[]) {
   const groups: { day: string; items: TransactionDTO[] }[] = [];
   for (const t of items) {
@@ -59,6 +69,10 @@ export function Transactions() {
   const accountId = params.get('accountId') ?? undefined;
   const categoryId = params.get('categoryId') ?? undefined;
   const qParam = params.get('q') ?? '';
+  // Intervalo exato vindo de outra tela (barra do gráfico, mês do relatório); vale mais que o período
+  const fromParam = params.get('from') ?? undefined;
+  const toParam = params.get('to') ?? undefined;
+  const custom = !!(fromParam || toParam);
 
   // Busca com atraso para não consultar a cada tecla
   const [search, setSearch] = useState(qParam);
@@ -74,6 +88,11 @@ export function Transactions() {
         const next = new URLSearchParams(p);
         if (value) next.set(key, value);
         else next.delete(key);
+        // Escolher um período troca o intervalo exato
+        if (key === 'period') {
+          next.delete('from');
+          next.delete('to');
+        }
         return next;
       },
       { replace: true },
@@ -81,8 +100,15 @@ export function Transactions() {
   }
 
   const filters: TxFilters = useMemo(
-    () => ({ q: qParam || undefined, type, unreviewed, accountId, categoryId, ...periodRange(period, today) }),
-    [qParam, type, unreviewed, accountId, categoryId, period, today],
+    () => ({
+      q: qParam || undefined,
+      type,
+      unreviewed,
+      accountId,
+      categoryId,
+      ...(custom ? { from: fromParam, to: toParam } : periodRange(period, today)),
+    }),
+    [qParam, type, unreviewed, accountId, categoryId, period, today, custom, fromParam, toParam],
   );
   const q = useTransactions(filters);
   const items = q.data?.pages.flatMap((p) => p.items) ?? [];
@@ -94,7 +120,17 @@ export function Transactions() {
   const review = useReview();
   const toast = useToast();
 
-  const extraFilters = [period !== 'all', !!accountId, !!categoryId].filter(Boolean).length;
+  const extraFilters = [period !== 'all' || custom, !!accountId, !!categoryId].filter(Boolean).length;
+  // Filtros que chegaram por link de outra tela: ficam à vista e saem com um toque
+  const active = [
+    custom && { key: 'range', label: rangeLabel(fromParam, toParam), clear: () => setParam('period', null) },
+    categoryId && {
+      key: 'cat',
+      label: categoryId === 'none' ? 'Sem categoria' : (categories.find((c) => c.id === categoryId)?.name ?? 'Categoria'),
+      clear: () => setParam('categoryId', null),
+    },
+    accountId && { key: 'acc', label: accounts.find((a) => a.id === accountId)?.name ?? 'Conta', clear: () => setParam('accountId', null) },
+  ].filter(Boolean) as { key: string; label: string; clear: () => void }[];
   // "terça-feira, 27 de outubro" -> "Terça-feira, 27 de outubro" (só a primeira letra)
   const label = (day: string) => {
     if (day === today) return 'Hoje';
@@ -144,16 +180,39 @@ export function Transactions() {
         </button>
       </div>
 
+      {active.length > 0 && (
+        <div className="chips fu" role="group" aria-label="Filtros ativos">
+          {active.map((f) => (
+            <button key={f.key} type="button" className="chip row" aria-pressed="true" style={{ gap: 6 }} onClick={f.clear} aria-label={`Remover filtro ${f.label}`}>
+              {f.label}
+              <X size={14} aria-hidden="true" />
+            </button>
+          ))}
+        </div>
+      )}
+
       {totals && (
         <div className="fu" style={{ animationDelay: '80ms', display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
-          <div className="card stack" style={{ gap: 6 }}>
+          <button
+            type="button"
+            className="card stack press"
+            style={{ gap: 6, textAlign: 'left' }}
+            aria-pressed={type === 'expense'}
+            onClick={() => setParam('type', type === 'expense' ? null : 'expense')}
+          >
             <span className="small muted">Gastos</span>
             <Money cents={totals.expenseCents} style={{ fontSize: 20, fontWeight: 600 }} />
-          </div>
-          <div className="card stack" style={{ gap: 6 }}>
+          </button>
+          <button
+            type="button"
+            className="card stack press"
+            style={{ gap: 6, textAlign: 'left' }}
+            aria-pressed={type === 'income'}
+            onClick={() => setParam('type', type === 'income' ? null : 'income')}
+          >
             <span className="small muted">Entradas</span>
             <Money cents={totals.incomeCents} style={{ fontSize: 20, fontWeight: 600, color: 'var(--positive)' }} />
-          </div>
+          </button>
         </div>
       )}
 
@@ -208,7 +267,7 @@ export function Transactions() {
       <Sheet state={filterSheet.state} onClose={filterSheet.close} title="Filtros">
         <FilterGroup label="Período">
           {PERIODS.map((p) => (
-            <button key={p.id} type="button" className="chip" aria-pressed={period === p.id} onClick={() => setParam('period', p.id === 'all' ? null : p.id)}>
+            <button key={p.id} type="button" className="chip" aria-pressed={!custom && period === p.id} onClick={() => setParam('period', p.id === 'all' ? null : p.id)}>
               {p.label}
             </button>
           ))}

@@ -1,5 +1,6 @@
 import type { Period } from '@financas/shared';
 import { useLayoutEffect, useRef, useState } from 'react';
+import { Link } from 'react-router';
 import { Money } from '../lib/privacy';
 import { useAnalysis } from '../lib/queries';
 import { Bars, Donut } from '../ui/charts';
@@ -50,7 +51,13 @@ export function Analysis() {
           Total gasto · {data?.name ?? '…'}
         </span>
         <div className="row" style={{ gap: 12, flexWrap: 'wrap' }}>
-          <Money cents={data?.totalCents ?? 0} style={{ fontSize: 38, fontWeight: 600, lineHeight: 1 }} />
+          {data ? (
+            <Link to={`/transacoes?type=expense&from=${data.start}&to=${data.end}`} className="press" aria-label="Ver os gastos do período">
+              <Money cents={data.totalCents} style={{ fontSize: 38, fontWeight: 600, lineHeight: 1 }} />
+            </Link>
+          ) : (
+            <Money cents={0} style={{ fontSize: 38, fontWeight: 600, lineHeight: 1 }} />
+          )}
           {delta !== null && delta !== undefined && (
             <span className="tag" style={{ fontSize: 13 }}>
               {delta > 0 ? '+' : delta < 0 ? '−' : ''}
@@ -64,7 +71,13 @@ export function Analysis() {
 
       <section className="card-lg stack fu" style={{ animationDelay: '180ms', gap: 16 }} aria-label="Gasto por período">
         <h2 className="h3">Por período</h2>
-        {data && <Bars key={period} bars={data.bars} />}
+        {data && (
+          <Bars
+            key={period}
+            bars={data.bars}
+            linkFor={(i) => `/transacoes?type=expense&from=${data.bars[i]!.from}&to=${data.bars[i]!.to}`}
+          />
+        )}
       </section>
 
       <section className="card-lg stack fu" style={{ animationDelay: '240ms', gap: 18 }} aria-label="Gasto por categoria">
@@ -74,6 +87,7 @@ export function Analysis() {
             key={period}
             items={data.categories}
             label={`${data.categories.length} ${data.categories.length === 1 ? 'categoria' : 'categorias'}`}
+            linkFor={(c) => (c.id === 'none' ? null : `/transacoes?categoryId=${c.id}&from=${data.start}&to=${data.end}`)}
           />
         ) : (
           <p className="small muted">Sem gastos neste período.</p>

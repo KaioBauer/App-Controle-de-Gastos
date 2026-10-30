@@ -1,7 +1,8 @@
 import type { BudgetDTO, CategoryDTO } from '@financas/shared';
 import { formatAmount, formatBRL, monthName } from '@financas/shared';
-import { Plus } from 'lucide-react';
+import { ChevronRight, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router';
 import { Money, usePrivacy } from '../lib/privacy';
 import { useBudgets, useDeleteBudget, useSetBudget } from '../lib/queries';
 import { OfflineBanner } from '../ui/common';
@@ -160,6 +161,12 @@ function BudgetSheet({
           {formatAmount(cents)}
         </span>
         <span className="small muted">Limite mensal{name ? ` · ${name}` : ''}</span>
+        {editing && (
+          <Link to={`/transacoes?categoryId=${editing.categoryId}&period=month`} className="link row" style={{ gap: 2, marginTop: 4 }}>
+            Ver gastos do mês
+            <ChevronRight size={14} aria-hidden="true" />
+          </Link>
+        )}
       </div>
 
       {!editing && (

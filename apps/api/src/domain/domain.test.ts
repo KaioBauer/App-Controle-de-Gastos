@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildAnalysis, periodRange } from './analysis';
+import { bucketRange, buildAnalysis, periodRange } from './analysis';
 import { budgetProgress, incomeOf, spendingByCategory, spendingOf, type FlowTx } from './spending';
 
 const tx = (p: Partial<FlowTx> & Pick<FlowTx, 'amountCents' | 'localDate'>): FlowTx => ({
@@ -110,5 +110,18 @@ describe('buildAnalysis', () => {
     expect(a.deltaPct).toBeNull();
     expect(a.insight).toBeNull();
     expect(a.bars[2]!.cents).toBe(500);
+  });
+});
+
+describe('bucketRange', () => {
+  it('semana: um dia por barra', () => {
+    expect(bucketRange('week', '2026-10-26', 3)).toEqual({ from: '2026-10-29', to: '2026-10-29' });
+  });
+  it('mês: semanas de 7 dias e a 5ª vai até o fim do mês', () => {
+    expect(bucketRange('month', '2026-10-01', 0)).toEqual({ from: '2026-10-01', to: '2026-10-07' });
+    expect(bucketRange('month', '2026-10-01', 4)).toEqual({ from: '2026-10-29', to: '2026-10-31' });
+  });
+  it('ano: um mês por barra', () => {
+    expect(bucketRange('year', '2026-01-01', 1)).toEqual({ from: '2026-02-01', to: '2026-02-28' });
   });
 });

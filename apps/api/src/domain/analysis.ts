@@ -71,6 +71,22 @@ export function periodRange(period: Period, today: string): PeriodRange {
   };
 }
 
+/** Dias que cada barra cobre, para abrir as transações dela. */
+export function bucketRange(period: Period, start: string, i: number): { from: string; to: string } {
+  if (period === 'week') {
+    const day = addDays(start, i);
+    return { from: day, to: day };
+  }
+  if (period === 'month') {
+    const ym = start.slice(0, 7);
+    const last = i === 4 ? daysInMonth(ym) : Math.min(7 * i + 7, daysInMonth(ym));
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return { from: `${ym}-${pad(7 * i + 1)}`, to: `${ym}-${pad(last)}` };
+  }
+  const ym = addMonths(start.slice(0, 7), i);
+  return { from: `${ym}-01`, to: `${ym}-${String(daysInMonth(ym)).padStart(2, '0')}` };
+}
+
 export interface CategoryInfo {
   id: string;
   name: string;
@@ -108,7 +124,7 @@ export function buildAnalysis(
   const currentToDate = current.filter((t) => t.localDate <= today);
 
   const totalCents = sumSpending(current);
-  const bars = r.labels.map((label, i) => ({ label, name: r.names[i]!, cents: 0 }));
+  const bars = r.labels.map((label, i) => ({ label, name: r.names[i]!, cents: 0, ...bucketRange(period, r.start, i) }));
   for (const tx of current) {
     const bar = bars[r.bucketOf(tx.localDate)];
     if (bar) bar.cents += sumSpending([tx]);
@@ -126,6 +142,8 @@ export function buildAnalysis(
   return {
     period,
     name: r.name,
+    start: r.start,
+    end: r.end,
     totalCents,
     deltaPct: pctChange(sumSpending(currentToDate), sumSpending(previousToDate)),
     previousName: r.previousName,
