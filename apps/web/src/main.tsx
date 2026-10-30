@@ -13,6 +13,8 @@ import { TransactionSheetProvider } from './ui/TransactionSheet';
 
 keepAppUpdated();
 fixStandaloneSafeArea();
+// O iOS ignora user-scalable=no no gesto de pinça: bloqueia aqui para o app não "dar zoom"
+document.addEventListener('gesturestart', (e) => e.preventDefault(), { passive: false });
 
 const queryClient = new QueryClient({
   defaultOptions: {

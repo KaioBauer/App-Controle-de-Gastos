@@ -193,7 +193,7 @@ function TransactionDetails({ tx, onClose, onChange }: { tx: TransactionDTO; onC
           rows={2}
           maxLength={1000}
           placeholder="Ex.: presente de aniversário"
-          style={{ border: 0, borderRadius: 18, background: 'var(--fill)', padding: '14px 16px', fontSize: 16, resize: 'none', outline: 'none', font: 'inherit' }}
+          style={{ border: 0, borderRadius: 18, background: 'var(--fill)', padding: '14px 16px', fontFamily: 'inherit', fontSize: 16, resize: 'none', outline: 'none' }}
         />
         <label className="small muted" htmlFor="tx-tags" style={{ fontWeight: 500 }}>
           Tags (separadas por vírgula)

@@ -693,3 +693,12 @@ html.app-locked body { overflow: hidden; }
 /* Em Ajustes a barra desce e some (volta deslizando ao sair) */
 .dock { transition: transform 0.35s var(--ease-sheet), opacity 0.25s ease; }
 .dock[data-hidden='true'] { transform: translateY(calc(100% + 40px)); opacity: 0; }
+
+/*
+ * Sem zoom, como num app: o iOS aproxima a tela ao focar um campo com letra menor que 16px
+ * (ex.: notas da transação), e o toque duplo também dava zoom.
+ */
+input,
+textarea,
+select { font-size: max(16px, 1em); }
+html { touch-action: manipulation; }
