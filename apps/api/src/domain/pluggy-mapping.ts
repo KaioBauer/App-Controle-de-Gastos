@@ -167,3 +167,46 @@ export function reconcile(existing: ExistingTx[], incoming: IncomingTx[]): Recon
   plan.remove = vanished.filter((v) => !usedVanished.has(v.id)).map((v) => v.id);
   return plan;
 }
+
+/** Categoria da Pluggy para transferência entre contas do mesmo titular. */
+export const SAME_PERSON_CATEGORY = /same (person|ownership)|mesma titularidade/i;
+
+export interface OwnTransferTx {
+  id: string;
+  accountId: string;
+  amountCents: number;
+  localDate: string;
+  pluggyCategory: string | null;
+}
+
+const dayDiff = (a: string, b: string) => Math.abs(Date.parse(a) - Date.parse(b)) / 86_400_000;
+
+/**
+ * Entradas "da mesma pessoa" que vêm de uma conta própria que não está no app (ex.: o salário
+ * caindo em outro banco e repassado). Sem a saída correspondente numa conta conectada, o dinheiro
+ * é novo para o app: conta como entrada, não como transferência.
+ * Devolve os ids dessas entradas; as que têm contrapartida (mesmo valor, até `windowDays` dias,
+ * outra conta) continuam transferências. Cada saída casa com uma só entrada.
+ */
+export function unmatchedOwnTransfers(txs: OwnTransferTx[], windowDays = 3): string[] {
+  const outgoing = txs.filter((t) => t.amountCents < 0);
+  const used = new Set<string>();
+  const unmatched: string[] = [];
+  const incoming = txs
+    .filter((t) => t.amountCents > 0 && SAME_PERSON_CATEGORY.test(t.pluggyCategory ?? ''))
+    .sort((a, b) => a.localDate.localeCompare(b.localDate));
+  for (const t of incoming) {
+    const match = outgoing
+      .filter(
+        (o) =>
+          !used.has(o.id) &&
+          o.accountId !== t.accountId &&
+          o.amountCents === -t.amountCents &&
+          dayDiff(o.localDate, t.localDate) <= windowDays,
+      )
+      .sort((a, b) => dayDiff(a.localDate, t.localDate) - dayDiff(b.localDate, t.localDate))[0];
+    if (match) used.add(match.id);
+    else unmatched.push(t.id);
+  }
+  return unmatched;
+}

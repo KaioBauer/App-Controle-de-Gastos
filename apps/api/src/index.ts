@@ -6,11 +6,13 @@ import { autoPayBills } from './modules/finance/bills';
 import { ensureDefaults } from './modules/finance/defaults';
 import { Notifier } from './modules/notifications/service';
 import { PluggyClient } from './modules/pluggy/client';
-import { onSyncFinished } from './modules/pluggy/sync';
+import { onSyncFinished, settleOwnTransfers } from './modules/pluggy/sync';
 import { createWebPushSender } from './modules/push/service';
 
 const env = loadEnv();
 await ensureDefaults();
+// Corrige dados já sincronizados com a regra atual de transferências próprias
+await settleOwnTransfers();
 const pluggy =
   env.PLUGGY_CLIENT_ID && env.PLUGGY_CLIENT_SECRET ? new PluggyClient(env.PLUGGY_CLIENT_ID, env.PLUGGY_CLIENT_SECRET) : null;
 const app = await buildApp(env, pluggy);

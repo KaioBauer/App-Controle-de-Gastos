@@ -1,7 +1,15 @@
 import { addDays, localDate, toCents } from '@financas/shared';
 import type { FastifyBaseLogger } from 'fastify';
 import { merchantKey, ruleCategory } from '../../domain/merchant';
-import { accountAmount, mapCategory, pluggyLocalDate, reconcile, signedCents } from '../../domain/pluggy-mapping';
+import {
+  accountAmount,
+  mapCategory,
+  pluggyLocalDate,
+  reconcile,
+  SAME_PERSON_CATEGORY,
+  signedCents,
+  unmatchedOwnTransfers,
+} from '../../domain/pluggy-mapping';
 import { prisma } from '../../lib/db';
 import type { PluggyAccount, PluggyClient, PluggyTransaction } from './client';
 
@@ -91,6 +99,7 @@ async function doSync(client: PluggyClient, itemId: string, log: FastifyBaseLogg
       log.warn({ err, itemId }, 'Investimentos indisponíveis'),
     );
 
+    await settleOwnTransfers();
     await prisma.pluggyItem.update({ where: { id: itemId }, data: { lastSyncAt: new Date(), lastSyncError: null } });
     log.info({ ...result, newTransactionIds: result.newTransactionIds.length }, 'Sync da Pluggy concluído');
     await runHooks(result, log);
@@ -289,4 +298,44 @@ async function syncInvestments(client: PluggyClient, itemId: string) {
     const data = { itemId, name: inv.name, type: inv.type, subtype: inv.subtype, balanceCents: BigInt(toCents(inv.balance)) };
     await prisma.investment.upsert({ where: { id: inv.id }, create: { id: inv.id, ...data }, update: data });
   }
+}
+
+/**
+ * Entradas "da mesma pessoa" sem a saída correspondente numa conta do app vieram de uma conta
+ * própria que não está conectada (ex.: salário repassado de outro banco): contam como entrada.
+ * Com contrapartida, continuam transferência. Respeita categoria travada e regras do usuário.
+ */
+export async function settleOwnTransfers() {
+  const [rows, catalog] = await Promise.all([
+    prisma.transaction.findMany({
+      where: { deletedAt: null, amountCents: { not: 0 } },
+      select: {
+        id: true,
+        accountId: true,
+        amountCents: true,
+        localDate: true,
+        pluggyCategory: true,
+        description: true,
+        categoryId: true,
+        categoryLocked: true,
+        isTransfer: true,
+      },
+    }),
+    loadCatalog(),
+  ]);
+  const unmatched = new Set(unmatchedOwnTransfers(rows.map((r) => ({ ...r, amountCents: Number(r.amountCents) }))));
+  const incomeId = catalog.idByName.get('Outras entradas');
+  const transferId = catalog.idByName.get('Transferências');
+  if (!incomeId || !transferId) return 0;
+
+  let changed = 0;
+  for (const r of rows) {
+    if (r.amountCents <= 0n || r.categoryLocked || !SAME_PERSON_CATEGORY.test(r.pluggyCategory ?? '')) continue;
+    if (ruleCategory(r.description, catalog.rules)) continue;
+    const target = unmatched.has(r.id) ? { categoryId: incomeId, isTransfer: false } : { categoryId: transferId, isTransfer: true };
+    if (r.categoryId === target.categoryId && r.isTransfer === target.isTransfer) continue;
+    await prisma.transaction.update({ where: { id: r.id }, data: target });
+    changed++;
+  }
+  return changed;
 }

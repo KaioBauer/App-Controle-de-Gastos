@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { connectionHealth } from './connection-health';
-import { accountAmount, mapCategory, pluggyLocalDate, reconcile, signedCents, type ExistingTx } from './pluggy-mapping';
+import { accountAmount, mapCategory, pluggyLocalDate, reconcile, signedCents, type ExistingTx, unmatchedOwnTransfers } from './pluggy-mapping';
 
 describe('accountAmount', () => {
   it('compra internacional usa o valor em reais, não o em dólar (caso real Claude)', () => {
@@ -126,5 +126,51 @@ describe('reconcile (deduplicação)', () => {
     ]);
     expect(plan.replace).toHaveLength(1);
     expect(plan.create).toHaveLength(1);
+  });
+});
+
+describe('unmatchedOwnTransfers', () => {
+  const tx = (id: string, accountId: string, amountCents: number, localDate: string, pluggyCategory: string | null = null) => ({
+    id,
+    accountId,
+    amountCents,
+    localDate,
+    pluggyCategory,
+  });
+
+  it('salário vindo de conta própria fora do app vira entrada (caso real Nubank)', () => {
+    const txs = [tx('sal', 'nu', 406850, '2026-10-03', 'Same person transfer'), tx('x', 'nu', -5000, '2026-10-03', 'Groceries')];
+    expect(unmatchedOwnTransfers(txs)).toEqual(['sal']);
+  });
+
+  it('com a saída correspondente em outra conta conectada continua transferência', () => {
+    const txs = [
+      tx('in', 'nu', 100000, '2026-10-03', 'Same person transfer'),
+      tx('out', 'itau', -100000, '2026-10-02', 'Same person transfer'),
+    ];
+    expect(unmatchedOwnTransfers(txs)).toEqual([]);
+  });
+
+  it('saída na mesma conta, valor diferente ou fora da janela não contam como contrapartida', () => {
+    const txs = [
+      tx('a', 'nu', 100000, '2026-10-10', 'Same person transfer'),
+      tx('b', 'nu', -100000, '2026-10-10'),
+      tx('c', 'itau', -99999, '2026-10-10'),
+      tx('d', 'itau', -100000, '2026-10-20'),
+    ];
+    expect(unmatchedOwnTransfers(txs)).toEqual(['a']);
+  });
+
+  it('cada saída casa com uma só entrada', () => {
+    const txs = [
+      tx('in1', 'nu', 5000, '2026-10-01', 'Same person transfer'),
+      tx('in2', 'nu', 5000, '2026-10-02', 'Same person transfer'),
+      tx('out', 'itau', -5000, '2026-10-01'),
+    ];
+    expect(unmatchedOwnTransfers(txs)).toEqual(['in2']);
+  });
+
+  it('ignora entradas que não são da mesma pessoa', () => {
+    expect(unmatchedOwnTransfers([tx('pix', 'nu', 8000, '2026-10-27', 'Transfers')])).toEqual([]);
   });
 });
