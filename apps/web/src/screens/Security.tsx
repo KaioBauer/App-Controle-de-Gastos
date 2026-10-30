@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ScanFace, Trash2 } from 'lucide-react';
 import { api } from '../lib/api';
+import { markUnlocked } from '../lib/lock';
 import { passkeysSupported, registerPasskey } from '../lib/passkey';
-import { OfflineBanner, PageHeader } from '../ui/common';
+import { OfflineBanner, PageHeader, Switch } from '../ui/common';
 import { useToast } from '../ui/Toast';
 
 interface PasskeyInfo {
@@ -19,11 +20,18 @@ export function Security() {
   const qc = useQueryClient();
   const toast = useToast();
   const keys = useQuery({ queryKey: ['passkeys'], queryFn: () => api<PasskeyInfo[]>('/auth/passkeys') });
+  const me = useQuery({ queryKey: ['me'], queryFn: () => api<{ username: string; appLock?: boolean }>('/auth/me') });
+  // Quem está nesta tela já está desbloqueado: ligar o bloqueio não deve pedir o Face ID agora
+  const refreshLock = () => {
+    markUnlocked(true);
+    qc.invalidateQueries({ queryKey: ['me'] });
+  };
   const add = useMutation({
     mutationFn: registerPasskey,
     onSuccess: () => {
       toast('Face ID cadastrado neste aparelho');
       qc.invalidateQueries({ queryKey: ['passkeys'] });
+      refreshLock();
     },
   });
   const remove = useMutation({
@@ -31,8 +39,19 @@ export function Security() {
     onSuccess: () => {
       toast('Passkey removida');
       qc.invalidateQueries({ queryKey: ['passkeys'] });
+      refreshLock();
     },
   });
+  const appLock = !!me.data?.appLock;
+  const toggleLock = useMutation({
+    mutationFn: (enabled: boolean) => api('/auth/app-lock', { method: 'PUT', body: { enabled } }),
+    onSuccess: (_, enabled) => {
+      toast(enabled ? 'Face ID será pedido ao abrir o app' : 'Bloqueio com Face ID desligado');
+      refreshLock();
+    },
+    onError: (e) => toast(e.message),
+  });
+  const hasKeys = !!keys.data && keys.data.length > 0;
 
   return (
     <main className="page">
@@ -55,7 +74,26 @@ export function Security() {
         </div>
       )}
 
-      {keys.data && keys.data.length > 0 && (
+      {hasKeys && (
+        <div className="list fu">
+          <button
+            type="button"
+            className="item"
+            role="switch"
+            aria-checked={appLock}
+            disabled={toggleLock.isPending || me.isPending}
+            onClick={() => toggleLock.mutate(!appLock)}
+          >
+            <span className="item-main">
+              <span className="item-title">Pedir Face ID ao abrir</span>
+              <span className="item-sub">Toda vez que você abre ou volta para o app. Saídas de até 3 segundos não contam.</span>
+            </span>
+            <Switch checked={appLock} />
+          </button>
+        </div>
+      )}
+
+      {hasKeys && (
         <section className="stack" style={{ gap: 10 }}>
           <h2 className="small muted" style={{ fontWeight: 500, paddingLeft: 4 }}>
             Passkeys cadastradas

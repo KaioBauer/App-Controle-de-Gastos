@@ -23,6 +23,18 @@ export async function registerPasskey() {
   await api('/auth/passkey/register/verify', { method: 'POST', body: response });
 }
 
+/** Desbloqueia o app com o Face ID de uma das passkeys do usuário logado. */
+export async function unlockWithPasskey() {
+  const optionsJSON = await api<Parameters<typeof startAuthentication>[0]['optionsJSON']>('/auth/unlock/options', { method: 'POST' });
+  let response;
+  try {
+    response = await startAuthentication({ optionsJSON });
+  } catch (err) {
+    throw friendly(err);
+  }
+  await api('/auth/unlock/verify', { method: 'POST', body: response });
+}
+
 /** Entra com Face ID/Touch ID; devolve o usuário logado. */
 export async function loginWithPasskey() {
   const optionsJSON = await api<Parameters<typeof startAuthentication>[0]['optionsJSON']>('/auth/passkey/login/options', { method: 'POST' });

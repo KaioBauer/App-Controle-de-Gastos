@@ -9,10 +9,11 @@ import {
   type RegistrationResponseJSON,
 } from '@simplewebauthn/server';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import type { Passkey } from '@prisma/client';
 import { z } from 'zod';
 import type { Env } from '../../env';
 import { prisma } from '../../lib/db';
-import { createSession, requireAuth } from '../../plugins/session';
+import { createSession, requireAuth, requireSession, setSessionLock } from '../../plugins/session';
 
 /** Desafios pendentes (instância única da API): id do desafio -> desafio e validade */
 const CHALLENGE_TTL_MS = 5 * 60 * 1000;
@@ -103,6 +104,8 @@ export async function passkeyRoutes(app: FastifyInstance, { env }: { env: Env })
         deviceName: deviceFromUA(request.headers['user-agent']),
       },
     });
+    // Com Face ID cadastrado, o app passa a pedir o Face ID ao abrir
+    await prisma.user.update({ where: { id: request.userId! }, data: { appLock: true } });
     return { ok: true };
   });
 
@@ -114,6 +117,10 @@ export async function passkeyRoutes(app: FastifyInstance, { env }: { env: Env })
   app.delete('/auth/passkeys/:id', { preHandler: requireAuth }, async (request) => {
     const { id } = request.params as { id: string };
     await prisma.passkey.deleteMany({ where: { id, userId: request.userId! } });
+    // Sem passkey não há como desbloquear com Face ID: o bloqueio desliga
+    if ((await prisma.passkey.count({ where: { userId: request.userId! } })) === 0) {
+      await prisma.user.update({ where: { id: request.userId! }, data: { appLock: false } });
+    }
     return { ok: true };
   });
 
@@ -133,11 +140,54 @@ export async function passkeyRoutes(app: FastifyInstance, { env }: { env: Env })
     const passkey = await prisma.passkey.findUnique({ where: { id: body.data.id } });
     if (!passkey) return reply.code(401).send({ error: 'Passkey não reconhecida. Entre com a senha e cadastre de novo.' });
 
-    let verification;
+    if (!(await verifyAssertion(request, pending.challenge, passkey))) {
+      return reply.code(401).send({ error: 'Não foi possível entrar com a passkey. Tente de novo ou use a senha.' });
+    }
+    await createSession(env, reply, passkey.userId, request.headers['user-agent']);
+    const user = await prisma.user.findUniqueOrThrow({ where: { id: passkey.userId } });
+    return { username: user.username };
+  });
+
+  // ---------- Desbloqueio do app (sessão existente, só as passkeys do próprio usuário) ----------
+  app.post(
+    '/auth/unlock/options',
+    { preHandler: requireSession, config: { rateLimit: { max: 20, timeWindow: '1 minute' } } },
+    async (request, reply) => {
+      const keys = await prisma.passkey.findMany({ where: { userId: request.userId! } });
+      if (keys.length === 0) return reply.code(400).send({ error: 'Nenhum Face ID cadastrado. Use a senha.' });
+      const options = await generateAuthenticationOptions({
+        rpID,
+        userVerification: 'required',
+        allowCredentials: keys.map((k) => ({ id: k.id, transports: k.transports as AuthenticatorTransportFuture[] })),
+      });
+      remember(reply, env, options.challenge, request.userId!);
+      return options;
+    },
+  );
+
+  app.post(
+    '/auth/unlock/verify',
+    { preHandler: requireSession, config: { rateLimit: { max: 10, timeWindow: '1 minute' } } },
+    async (request, reply) => {
+      const pending = take(request, reply);
+      if (!pending || pending.userId !== request.userId) return reply.code(400).send({ error: 'Pedido expirado. Tente de novo.' });
+      const body = z.object({ id: z.string().min(1) }).passthrough().safeParse(request.body);
+      if (!body.success) return reply.code(400).send({ error: 'Resposta inválida' });
+      const passkey = await prisma.passkey.findUnique({ where: { id: body.data.id } });
+      if (!passkey || passkey.userId !== request.userId || !(await verifyAssertion(request, pending.challenge, passkey))) {
+        return reply.code(401).send({ error: 'Não foi possível desbloquear. Tente de novo ou use a senha.' });
+      }
+      await setSessionLock(request.sessionId!, false);
+      return { locked: false };
+    },
+  );
+
+  /** Confere a resposta do Face ID e atualiza o contador da passkey. */
+  async function verifyAssertion(request: FastifyRequest, challenge: string, passkey: Passkey) {
     try {
-      verification = await verifyAuthenticationResponse({
+      const verification = await verifyAuthenticationResponse({
         response: request.body as AuthenticationResponseJSON,
-        expectedChallenge: pending.challenge,
+        expectedChallenge: challenge,
         expectedOrigin: origin,
         expectedRPID: rpID,
         requireUserVerification: true,
@@ -148,18 +198,15 @@ export async function passkeyRoutes(app: FastifyInstance, { env }: { env: Env })
           transports: passkey.transports as AuthenticatorTransportFuture[],
         },
       });
+      if (!verification.verified) return false;
+      await prisma.passkey.update({
+        where: { id: passkey.id },
+        data: { counter: BigInt(verification.authenticationInfo.newCounter), lastUsedAt: new Date() },
+      });
+      return true;
     } catch (err) {
-      request.log.warn({ err }, 'Login com passkey recusado');
-      return reply.code(401).send({ error: 'Não foi possível entrar com a passkey. Tente de novo ou use a senha.' });
+      request.log.warn({ err }, 'Verificação de passkey recusada');
+      return false;
     }
-    if (!verification.verified) return reply.code(401).send({ error: 'Não foi possível verificar a passkey' });
-
-    await prisma.passkey.update({
-      where: { id: passkey.id },
-      data: { counter: BigInt(verification.authenticationInfo.newCounter), lastUsedAt: new Date() },
-    });
-    await createSession(env, reply, passkey.userId, request.headers['user-agent']);
-    const user = await prisma.user.findUniqueOrThrow({ where: { id: passkey.userId } });
-    return { username: user.username };
-  });
+  }
 }

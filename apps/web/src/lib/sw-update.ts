@@ -1,3 +1,5 @@
+import { markPageUnloading } from './lock';
+
 /**
  * Mantém o app na versão mais recente.
  *
@@ -14,6 +16,7 @@ export function keepAppUpdated() {
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (!hadController || reloading) return;
     reloading = true;
+    markPageUnloading();
     window.location.reload();
   });
 

@@ -12,6 +12,8 @@ declare module 'fastify' {
   interface FastifyRequest {
     userId: string | null;
     sessionId: string | null;
+    /** Sessão válida, mas bloqueada até o Face ID (ou a senha) */
+    locked: boolean;
   }
 }
 
@@ -49,6 +51,7 @@ export async function destroySession(env: Env, request: FastifyRequest, reply: F
 export function registerSession(app: FastifyInstance, env: Env) {
   app.decorateRequest('userId', null);
   app.decorateRequest('sessionId', null);
+  app.decorateRequest('locked', false);
 
   app.addHook('onRequest', async (request, reply) => {
     const token = request.cookies[SESSION_COOKIE];
@@ -62,6 +65,7 @@ export function registerSession(app: FastifyInstance, env: Env) {
     }
     request.userId = session.userId;
     request.sessionId = id;
+    request.locked = session.lockedAt !== null;
 
     if (Date.now() - session.lastSeenAt.getTime() > TOUCH_INTERVAL_MS) {
       await prisma.session.update({
@@ -73,6 +77,17 @@ export function registerSession(app: FastifyInstance, env: Env) {
   });
 }
 
+/** Sessão desbloqueada: exigido por todas as rotas com dados. */
 export async function requireAuth(request: FastifyRequest, reply: FastifyReply) {
   if (!request.userId) return reply.code(401).send({ error: 'Não autenticado' });
+  if (request.locked) return reply.code(423).send({ error: 'App bloqueado' });
+}
+
+/** Qualquer sessão válida, mesmo bloqueada (rotas de bloqueio e desbloqueio). */
+export async function requireSession(request: FastifyRequest, reply: FastifyReply) {
+  if (!request.userId) return reply.code(401).send({ error: 'Não autenticado' });
+}
+
+export async function setSessionLock(sessionId: string, locked: boolean) {
+  await prisma.session.update({ where: { id: sessionId }, data: { lockedAt: locked ? new Date() : null } });
 }

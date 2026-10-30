@@ -13,6 +13,8 @@ model User {
   id           String    @id @default(uuid())
   username     String    @unique
   passwordHash String
+  // Pede Face ID ao abrir e ao voltar para o app (liga sozinho ao cadastrar uma passkey)
+  appLock      Boolean   @default(false)
   createdAt    DateTime  @default(now())
   sessions     Session[]
   passkeys     Passkey[]
@@ -44,6 +46,8 @@ model Session {
   createdAt  DateTime @default(now())
   lastSeenAt DateTime @default(now())
   expiresAt  DateTime
+  // App foi para o segundo plano: a API recusa dados até desbloquear com Face ID ou senha
+  lockedAt   DateTime?
 
   @@index([userId])
 }

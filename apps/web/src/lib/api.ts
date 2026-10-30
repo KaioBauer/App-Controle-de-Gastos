@@ -1,4 +1,5 @@
 import { API_CACHE_NAME } from '@financas/shared';
+import { LOCKED_EVENT } from './lock';
 
 export class ApiError extends Error {
   constructor(
@@ -17,6 +18,8 @@ export async function api<T>(path: string, init: { method?: string; body?: unkno
     body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
   });
   const data = res.headers.get('content-type')?.includes('application/json') ? await res.json() : null;
+  // Sessão bloqueada no servidor: o App mostra a tela do Face ID
+  if (res.status === 423) window.dispatchEvent(new Event(LOCKED_EVENT));
   if (!res.ok) throw new ApiError(res.status, data?.error ?? `Erro ${res.status}`);
   return data as T;
 }

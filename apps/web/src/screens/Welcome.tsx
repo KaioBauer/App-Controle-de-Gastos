@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
 import { ScanFace } from 'lucide-react';
 import { api } from '../lib/api';
+import { markUnlocked } from '../lib/lock';
 import { loginWithPasskey, passkeysSupported } from '../lib/passkey';
 import { KaixaGlyph } from '../ui/icons';
 
@@ -15,7 +16,7 @@ function wasOnboarded() {
   }
 }
 
-function Brand() {
+export function Brand() {
   return (
     <div className="row" style={{ gap: 10 }}>
       <div style={{ width: 30, height: 30, borderRadius: 9, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -131,13 +132,19 @@ function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
+  // Acabou de se autenticar: não pede o Face ID de novo nesta abertura
+  const onLoggedIn = (me: { username: string }) => {
+    markUnlocked(true);
+    qc.setQueryData(['me'], { ...me, locked: false });
+    qc.invalidateQueries({ queryKey: ['me'] });
+  };
   const login = useMutation({
     mutationFn: () => api<{ username: string }>('/auth/login', { method: 'POST', body: { username, password } }),
-    onSuccess: (me) => qc.setQueryData(['me'], me),
+    onSuccess: onLoggedIn,
   });
   const passkey = useMutation({
     mutationFn: loginWithPasskey,
-    onSuccess: (me) => qc.setQueryData(['me'], me),
+    onSuccess: onLoggedIn,
   });
   const error = login.error ?? passkey.error;
 
