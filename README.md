@@ -11,7 +11,7 @@ PWA instalável no iPhone com notificações push, integrada à Pluggy (Open Fin
 | `packages/shared` | Dinheiro em centavos, datas no fuso de São Paulo, tipos de push |
 | `deploy/` | Exemplo de Nginx da VPS |
 
-**Status:** etapas 1 e 2 concluídas (PWA + push, design Kaixa, lançamentos manuais, orçamentos, análise e sincronização com o Meu Pluggy).
+**Funcionalidades:** PWA instalável com push; sincronização com o Meu Pluggy; Início, Cartões (fatura, despesas fixas, parcelamentos), Análise com relatórios (fluxo de caixa, saldo mês a mês, comparação, CSV), Orçamentos e Metas; Transações com busca, filtros, regras de categoria e revisão; Contas a pagar com baixa automática; notificações configuráveis com horário de silêncio; categorias personalizadas; login com senha ou Face ID (passkey).
 
 ## Rodar localmente
 
@@ -103,3 +103,26 @@ docker compose up -d          # recarrega o .env
 ```
 
 Depois, no app (já em HTTPS), toque em **Ajustes › Conexões bancárias › Registrar webhook**. O app cria o webhook na Pluggy com esse header. Sem webhook, o job de hora em hora continua funcionando.
+
+## Backup do banco
+
+`deploy/backup.sh` faz o dump diário do Postgres em `/opt/backups/kaixa/kaixa-AAAA-MM-DD.sql.gz` e mantém 14 dias.
+
+```bash
+chmod +x /opt/kaixa/deploy/backup.sh
+( crontab -l; echo "0 4 * * * /opt/kaixa/deploy/backup.sh >> /var/log/kaixa-backup.log 2>&1" ) | crontab -
+```
+
+Para restaurar (substitui o conteúdo atual do banco):
+
+```bash
+cd /opt/kaixa
+gunzip -c /opt/backups/kaixa/kaixa-AAAA-MM-DD.sql.gz | docker compose -p kaixa exec -T db psql -U kaixa -d kaixa
+```
+
+Os backups ficam na própria VPS. Para ter uma cópia fora dela, copie a pasta periodicamente (por exemplo `scp -r root@2.24.114.161:/opt/backups/kaixa .`).
+
+## Notificações
+
+Configuráveis em **Ajustes › Notificações**: nova transação (com valor mínimo), orçamento em 80% e 100%, contas e faturas vencendo (3 dias antes e no dia), saldo baixo, gasto incomum, resumo semanal (domingo 20h), fechamento do mês (dia 1º 9h) e problemas nas conexões. No horário de silêncio os avisos esperam na fila e chegam quando ele termina.
+
