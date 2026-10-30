@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Bell, CalendarClock, ChevronRight, EyeOff, Landmark, LogOut, Shapes, Wand2 } from 'lucide-react';
+import { Bell, CalendarClock, ChevronRight, EyeOff, Landmark, LogOut, ScanFace, Shapes, Wand2 } from 'lucide-react';
 import { Link } from 'react-router';
 import { api, clearOfflineData } from '../lib/api';
 import { setBadge } from '../lib/platform';
@@ -52,6 +52,16 @@ export function Settings() {
       </div>
 
       <div className="list fu" style={{ animationDelay: '90ms' }}>
+        <Link to="/ajustes/seguranca" className="item">
+          <span className="tile">
+            <ScanFace size={20} strokeWidth={1.8} aria-hidden="true" />
+          </span>
+          <span className="item-main">
+            <span className="item-title">Segurança</span>
+            <span className="item-sub">Entrar com Face ID</span>
+          </span>
+          <ChevronRight className="item-chevron" size={20} aria-hidden="true" />
+        </Link>
         <Link to="/ajustes/categorias" className="item">
           <span className="tile">
             <Shapes size={20} strokeWidth={1.8} aria-hidden="true" />

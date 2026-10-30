@@ -3,6 +3,7 @@ import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
 import Fastify from 'fastify';
 import type { Env } from './env';
+import { passkeyRoutes } from './modules/auth/passkeys';
 import { authRoutes } from './modules/auth/routes';
 import { billRoutes } from './modules/finance/bills';
 import { cardRoutes } from './modules/finance/cards';
@@ -42,6 +43,7 @@ export async function buildApp(env: Env, pluggy: PluggyClient | null) {
     async (api) => {
       api.get('/health', async () => ({ ok: true }));
       await api.register(authRoutes, { env });
+      await api.register(passkeyRoutes, { env });
       await api.register(pushRoutes, { env });
       await api.register(financeRoutes);
       await api.register(cardRoutes);

@@ -15,6 +15,24 @@ model User {
   passwordHash String
   createdAt    DateTime  @default(now())
   sessions     Session[]
+  passkeys     Passkey[]
+}
+
+// Passkey (Face ID / Touch ID / chave de segurança) para entrar sem senha
+model Passkey {
+  // credentialID em base64url
+  id         String    @id
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  publicKey  Bytes
+  counter    BigInt    @default(0)
+  transports String[]  @default([])
+  // Ex.: "iPhone", para identificar na lista
+  deviceName String
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+
+  @@index([userId])
 }
 
 model Session {

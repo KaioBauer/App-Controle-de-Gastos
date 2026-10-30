@@ -1,6 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
+import { ScanFace } from 'lucide-react';
 import { api } from '../lib/api';
+import { loginWithPasskey, passkeysSupported } from '../lib/passkey';
 import { KaixaGlyph } from '../ui/icons';
 
 const ONBOARDED = 'onboarded';
@@ -133,6 +135,11 @@ function Login() {
     mutationFn: () => api<{ username: string }>('/auth/login', { method: 'POST', body: { username, password } }),
     onSuccess: (me) => qc.setQueryData(['me'], me),
   });
+  const passkey = useMutation({
+    mutationFn: loginWithPasskey,
+    onSuccess: (me) => qc.setQueryData(['me'], me),
+  });
+  const error = login.error ?? passkey.error;
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -179,15 +186,20 @@ function Login() {
             required
           />
         </div>
-        {login.error && (
+        {error && (
           <p role="alert" style={{ fontSize: 14, color: '#FF8A7E' }}>
-            {login.error.message}
+            {error.message}
           </p>
         )}
         <button className="btn fu" type="submit" disabled={login.isPending} style={{ marginTop: 14, animationDelay: '240ms' }}>
           {login.isPending ? 'Entrando…' : 'Entrar'}
         </button>
-        <p style={{ fontSize: 13, color: '#6B7079', textAlign: 'center' }}>Login com passkey (Face ID) chega na etapa de segurança.</p>
+        {passkeysSupported() && (
+          <button type="button" className="btn btn-ghost row" style={{ gap: 8 }} onClick={() => passkey.mutate()} disabled={passkey.isPending}>
+            <ScanFace size={20} strokeWidth={1.8} aria-hidden="true" />
+            {passkey.isPending ? 'Aguardando Face ID…' : 'Entrar com Face ID / passkey'}
+          </button>
+        )}
       </form>
     </>
   );
