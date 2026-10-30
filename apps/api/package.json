@@ -11,7 +11,8 @@
     "typecheck": "tsc -p .",
     "prisma": "dotenv -e ../../.env -- prisma",
     "create-user": "tsx --env-file=../../.env src/cli/create-user.ts",
-    "gen-vapid": "tsx src/cli/gen-vapid.ts"
+    "gen-vapid": "tsx src/cli/gen-vapid.ts",
+    "push": "tsx --env-file=../../.env src/cli/send-push.ts"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.5",

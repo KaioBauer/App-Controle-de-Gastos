@@ -10,6 +10,7 @@
     "db:up": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d db",
     "db:migrate": "pnpm --filter @financas/api prisma migrate dev",
     "create-user": "pnpm --filter @financas/api create-user",
-    "gen-vapid": "pnpm --filter @financas/api gen-vapid"
+    "gen-vapid": "pnpm --filter @financas/api gen-vapid",
+    "push": "pnpm --filter @financas/api push"
   }
 }
