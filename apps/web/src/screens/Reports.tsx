@@ -60,8 +60,8 @@ function Cashflow({ data }: { data: ReportsDTO }) {
             style={{ flex: 1, minWidth: 0, height: '100%', alignItems: 'center', justifyContent: 'flex-end', gap: 6, opacity: i === sel ? 1 : 0.55, transition: 'opacity .2s' }}
           >
             <span className="row" style={{ alignItems: 'flex-end', gap: 2, height: 104, width: '100%', justifyContent: 'center' }}>
-              <span className="gy" style={{ width: '40%', maxWidth: 10, borderRadius: 4, background: 'var(--accent)', height: Math.max(3, (r.incomeCents / max) * 104), animationDelay: `${i * 30}ms` }} />
-              <span className="gy" style={{ width: '40%', maxWidth: 10, borderRadius: 4, background: 'var(--c3)', height: Math.max(3, (r.expenseCents / max) * 104), animationDelay: `${i * 30}ms` }} />
+              <span className="gy" style={{ width: '40%', maxWidth: 10, borderRadius: 4, background: 'var(--cat3)', height: Math.max(3, (r.incomeCents / max) * 104), animationDelay: `${i * 30}ms` }} />
+              <span className="gy" style={{ width: '40%', maxWidth: 10, borderRadius: 4, background: 'var(--cat2)', height: Math.max(3, (r.expenseCents / max) * 104), animationDelay: `${i * 30}ms` }} />
             </span>
             <span className="bar-label">{short(r.month)}</span>
           </button>
@@ -69,10 +69,10 @@ function Cashflow({ data }: { data: ReportsDTO }) {
       </div>
       <div className="row small muted" style={{ gap: 14 }}>
         <span className="row" style={{ gap: 6 }}>
-          <span style={{ width: 10, height: 10, borderRadius: 3, background: 'var(--accent)' }} /> Entradas
+          <span style={{ width: 10, height: 10, borderRadius: 3, background: 'var(--cat3)' }} /> Entradas
         </span>
         <span className="row" style={{ gap: 6 }}>
-          <span style={{ width: 10, height: 10, borderRadius: 3, background: 'var(--c3)' }} /> Saídas
+          <span style={{ width: 10, height: 10, borderRadius: 3, background: 'var(--cat2)' }} /> Saídas
         </span>
       </div>
     </section>
@@ -104,8 +104,8 @@ function BalanceLine({ data }: { data: ReportsDTO }) {
       </div>
       <div style={{ position: 'relative' }}>
         <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none" aria-hidden="true" style={{ overflow: 'visible' }}>
-          <polygon points={`0,${H} ${line} ${W},${H}`} fill="var(--accent)" opacity="0.12" />
-          <polyline points={line} fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" className="dr" />
+          <polygon points={`0,${H} ${line} ${W},${H}`} fill="var(--cat4)" opacity="0.12" />
+          <polyline points={line} fill="none" stroke="var(--cat4)" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" className="dr" />
           {min < 0 && <line x1="0" x2={W} y1={y(0)} y2={y(0)} stroke="var(--c5)" strokeDasharray="4 4" vectorEffect="non-scaling-stroke" />}
         </svg>
         {/* Ponto fora do SVG: com preserveAspectRatio="none" um círculo viraria elipse */}

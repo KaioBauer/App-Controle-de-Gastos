@@ -26,6 +26,14 @@
   --c4: #b9bdc4;
   --c5: #dde0e4;
   --bar: #dde0e4;
+  /* Cores por categoria nos gráficos (ordem fixa, validadas para daltonismo e contraste) */
+  --cat1: #5b47e8;
+  --cat2: #f08a24;
+  --cat3: #1e9e6a;
+  --cat4: #2e8bf0;
+  --cat5: #c9437a;
+  --cat-other: #b9bdc4;
+  --bar-soft: #d9d4fb;
   --shadow: 0 12px 32px rgba(14, 15, 18, 0.18);
   --scrim: rgba(14, 15, 18, 0.45);
 
@@ -62,6 +70,13 @@
     --c4: #5a5f68;
     --c5: #3a3d44;
     --bar: #33363d;
+    --cat1: #8b7bff;
+    --cat2: #d6741c;
+    --cat3: #22a470;
+    --cat4: #3b8fe6;
+    --cat5: #e0628f;
+    --cat-other: #5a5f68;
+    --bar-soft: #3a3560;
     --shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
     --scrim: rgba(0, 0, 0, 0.6);
   }
@@ -167,7 +182,7 @@ p {
   max-width: 560px;
   margin: 0 auto;
   min-height: 100dvh;
-  padding: calc(var(--safe-top) + 34px) calc(var(--gutter) + var(--safe-right)) calc(var(--dock-bottom) + 104px)
+  padding: calc(var(--safe-top) + 22px) calc(var(--gutter) + var(--safe-right)) calc(var(--dock-bottom) + 104px)
     calc(var(--gutter) + var(--safe-left));
   display: flex;
   flex-direction: column;
@@ -347,11 +362,11 @@ a.item:active { background: var(--fill); }
   width: 100%;
   max-width: 32px;
   border-radius: 10px;
-  background: var(--bar);
+  background: var(--bar-soft);
   transition: height 0.55s var(--ease), background 0.3s ease;
 }
 .bar[data-peak='true'],
-.bar[data-selected='true'] { background: var(--accent); }
+.bar[data-selected='true'] { background: var(--cat1); }
 .bar[data-zero='true'] { background: var(--fill); }
 .bar-label { font-size: 12px; color: var(--ink-2); }
 
@@ -552,22 +567,27 @@ a.item:active { background: var(--fill); }
   position: fixed;
   top: calc(var(--safe-top) + 16px);
   left: 50%;
-  z-index: 50;
+  /* Acima das folhas e do bloqueio de tela não */
+  z-index: 60;
   display: flex;
   align-items: center;
   gap: 10px;
+  /* Mensagem longa quebra linha em vez de sair pelas laterais da tela */
+  width: max-content;
+  max-width: calc(100vw - 32px - var(--safe-left) - var(--safe-right));
   background: var(--hero);
   color: var(--hero-ink);
   padding: 12px 18px 12px 12px;
-  border-radius: 999px;
+  border-radius: 24px;
   font-size: 14px;
   font-weight: 500;
-  white-space: nowrap;
+  line-height: 1.3;
   box-shadow: 0 10px 30px rgba(14, 15, 18, 0.25);
   animation: pop 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
 }
 .toast-icon {
   width: 24px;
+  flex-shrink: 0;
   height: 24px;
   border-radius: 12px;
   background: var(--accent);

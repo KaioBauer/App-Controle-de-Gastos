@@ -40,3 +40,25 @@ export async function setBadge(count: number) {
     // Sem permissão de notificação o iOS rejeita; não é um erro para o usuário
   }
 }
+
+/** Altura da barra de status dos iPhones com ilha dinâmica (a maior entre os modelos atuais). */
+const STATUS_BAR_FALLBACK_PX = 54;
+
+/**
+ * No app instalado, o iOS desenha a página por baixo da barra de status, mas em algumas versões
+ * informa `safe-area-inset-top` = 0: o conteúdo do topo fica embaixo do relógio/ilha (e do
+ * desfoque que o iOS aplica ali). Quando a página ocupa a tela inteira e o inset veio zerado,
+ * reserva a altura da barra de status.
+ */
+export function fixStandaloneSafeArea() {
+  if (!isIOS() || !isStandalone()) return;
+  const probe = document.createElement('div');
+  probe.style.cssText = 'position:fixed;top:0;left:0;visibility:hidden;padding-top:env(safe-area-inset-top,0px)';
+  document.body.appendChild(probe);
+  const inset = parseFloat(getComputedStyle(probe).paddingTop) || 0;
+  probe.remove();
+  const underStatusBar = window.innerHeight >= window.screen.height - 1;
+  if (inset === 0 && underStatusBar) {
+    document.documentElement.style.setProperty('--safe-top', `${STATUS_BAR_FALLBACK_PX}px`);
+  }
+}

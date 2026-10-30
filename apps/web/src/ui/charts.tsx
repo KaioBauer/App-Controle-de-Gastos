@@ -71,7 +71,8 @@ export function Bars({
 
 const R = 52;
 const C = 2 * Math.PI * R;
-export const DONUT_COLORS = ['var(--c1)', 'var(--accent)', 'var(--c3)', 'var(--c4)', 'var(--c5)'];
+// 4 maiores com cores distintas; "Outras" (o resto) em cinza
+export const DONUT_COLORS = ['var(--cat1)', 'var(--cat2)', 'var(--cat3)', 'var(--cat4)', 'var(--cat-other)'];
 
 /**
  * Rosca por categoria: 4 maiores + "Outras". Cada categoria da legenda pode abrir as transações

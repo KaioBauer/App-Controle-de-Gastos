@@ -18,7 +18,12 @@ import { prismaSubscriptionStore } from '../modules/push/store';
  */
 const USAGE = 'Uso: send-push --usuario <nome> "Título" "Mensagem" [--url /tela] | --listar';
 
+// --args-b64 <json em base64>: argumentos vindos do PowerShell (deploy/push.ps1) sem passar por aspas
+const raw = process.argv.slice(2);
+const args = raw[0] === '--args-b64' && raw[1] ? (JSON.parse(Buffer.from(raw[1], 'base64').toString('utf8')) as string[]) : raw;
+
 const { values, positionals } = parseArgs({
+  args,
   allowPositionals: true,
   options: {
     usuario: { type: 'string', short: 'u' },
