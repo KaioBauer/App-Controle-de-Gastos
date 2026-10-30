@@ -100,9 +100,31 @@ describe('buildAnalysis', () => {
     expect(a.bars.map((b) => b.cents)).toEqual([10000, 100000, 0, 0, 0]);
     expect(a.categories.map((c) => c.name)).toEqual(['Casa', 'Alimentação']);
     expect(a.deltaPct).toBe(-8); // 110000 vs 120000
+    // Casa ficou igual; Alimentação caiu R$ 100 (de R$ 200 para R$ 100)
     expect(a.insight?.title).toBe('Alimentação caiu 50%');
-    expect(a.insight?.body).toContain('Comparado a setembro.');
+    expect(a.insight?.body).toContain('no mesmo trecho em setembro.');
     expect(a.insight?.body).toContain('sobrando');
+  });
+
+  it('base pequena no período anterior: fala em reais, não em "1866%"', () => {
+    const txs = [
+      tx({ amountCents: -1000, localDate: '2026-09-05', categoryId: 'food' }),
+      tx({ amountCents: -19660, localDate: '2026-10-05', categoryId: 'food' }),
+    ];
+    const a = buildAnalysis('month', '2026-10-15', txs, cats);
+    expect(a.insight?.title).toMatch(/^Alimentação subiu R\$\s?186,60$/);
+    expect(a.deltaPct).toBeNull();
+  });
+
+  it('escolhe a categoria que mais mudou em reais, não a de maior percentual', () => {
+    const txs = [
+      tx({ amountCents: -10000, localDate: '2026-09-05', categoryId: 'food' }),
+      tx({ amountCents: -30000, localDate: '2026-10-05', categoryId: 'food' }),
+      tx({ amountCents: -100000, localDate: '2026-09-05', categoryId: 'home' }),
+      tx({ amountCents: -160000, localDate: '2026-10-05', categoryId: 'home' }),
+    ];
+    const a = buildAnalysis('month', '2026-10-15', txs, cats);
+    expect(a.insight?.title).toBe('Casa subiu 60%');
   });
 
   it('sem histórico não inventa variação nem insight', () => {

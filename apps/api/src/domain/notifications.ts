@@ -171,8 +171,13 @@ export function unusualNotices(txs: TxInfo[], historyByCategory: Map<string, num
 }
 
 export function weeklySummaryNotice(weekStart: string, spentCents: number, previousCents: number, top: { name: string; cents: number } | null): Notice {
+  // Percentual só com base relevante e variação legível; senão, a diferença em reais
   const delta = previousCents > 0 ? Math.round(((spentCents - previousCents) / previousCents) * 100) : null;
-  const trend = delta === null ? '' : delta > 0 ? ` (${delta}% a mais que a semana anterior)` : delta < 0 ? ` (${-delta}% a menos que a semana anterior)` : ' (igual à semana anterior)';
+  const diff = spentCents - previousCents;
+  const readable = delta !== null && previousCents >= 10_000 && Math.abs(delta) <= 200;
+  const amount = readable ? `${Math.abs(delta)}%` : formatBRL(Math.abs(diff));
+  const trend =
+    previousCents <= 0 ? '' : diff > 0 ? ` (${amount} a mais que a semana anterior)` : diff < 0 ? ` (${amount} a menos que a semana anterior)` : ' (igual à semana anterior)';
   return {
     dedupeKey: `weekly:${weekStart}`,
     type: 'weeklySummary',

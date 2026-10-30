@@ -100,6 +100,12 @@ function pctChange(current: number, previous: number): number | null {
 }
 
 const MIN_INSIGHT_CENTS = 5_000;
+/**
+ * Percentual só com base de comparação relevante e variação legível: "subiu 1866%" (de R$ 10
+ * para R$ 196) não diz nada. Fora disso, o destaque fala em reais.
+ */
+const MIN_PCT_BASE_CENTS = 10_000;
+const MAX_READABLE_PCT = 200;
 
 export interface BudgetInfo {
   totalCents: number;
@@ -145,7 +151,9 @@ export function buildAnalysis(
     start: r.start,
     end: r.end,
     totalCents,
-    deltaPct: pctChange(sumSpending(currentToDate), sumSpending(previousToDate)),
+    // Sem base relevante no período anterior, a variação total também não aparece
+    deltaPct:
+      sumSpending(previousToDate) >= MIN_PCT_BASE_CENTS ? pctChange(sumSpending(currentToDate), sumSpending(previousToDate)) : null,
     previousName: r.previousName,
     bars,
     categories: cats,
@@ -165,13 +173,14 @@ function buildInsight(
   const now = spendingByCategory(current);
   const before = spendingByCategory(previous);
 
-  let best: { name: string; change: number } | null = null;
-  for (const [id, prev] of before) {
-    const cur = now.get(id) ?? 0;
-    if (!id || Math.max(cur, prev) < MIN_INSIGHT_CENTS) continue;
-    const change = pctChange(cur, prev);
-    if (change === null || change === 0) continue;
-    if (!best || Math.abs(change) > Math.abs(best.change)) best = { name: categories.get(id)?.name ?? 'Categoria', change };
+  // A categoria que mais mudou em reais (não a de maior %, que favorece bases pequenas)
+  let best: { name: string; cur: number; prev: number } | null = null;
+  for (const id of new Set([...before.keys(), ...now.keys()])) {
+    if (!id) continue;
+    const cur = Math.max(0, now.get(id) ?? 0);
+    const prev = Math.max(0, before.get(id) ?? 0);
+    if (prev === 0 || Math.abs(cur - prev) < MIN_INSIGHT_CENTS) continue;
+    if (!best || Math.abs(cur - prev) > Math.abs(best.cur - best.prev)) best = { name: categories.get(id)?.name ?? 'Categoria', cur, prev };
   }
 
   let projection = '';
@@ -187,9 +196,14 @@ function buildInsight(
   }
 
   if (!best) return projection ? { title: 'Projeção do mês', body: projection.trim() } : null;
-  const verb = best.change < 0 ? 'caiu' : 'subiu';
+  const diff = best.cur - best.prev;
+  const verb = diff < 0 ? 'caiu' : 'subiu';
+  const pct = pctChange(best.cur, best.prev);
+  const amount =
+    best.prev >= MIN_PCT_BASE_CENTS && pct !== null && Math.abs(pct) <= MAX_READABLE_PCT ? `${Math.abs(pct)}%` : formatBRL(Math.abs(diff));
+  const vs = period === 'week' ? 'na' : 'em';
   return {
-    title: `${best.name} ${verb} ${Math.abs(best.change)}%`,
-    body: `Comparado ${period === 'week' ? 'à' : 'a'} ${previousName}.${projection}`,
+    title: `${best.name} ${verb} ${amount}`,
+    body: `${formatBRL(best.cur)} até agora, contra ${formatBRL(best.prev)} no mesmo trecho ${vs} ${previousName}.${projection}`,
   };
 }
