@@ -385,57 +385,78 @@ a.item:active { background: var(--fill); }
   box-shadow: var(--shadow);
   position: relative;
 }
-/* Pílula da aba ativa: desliza entre as abas (posição e largura medidas no Dock) */
+/*
+ * Abas e pílula posicionadas pelo Dock (posições finais calculadas de uma vez).
+ * Tudo anima só com transform/opacity, que o iPhone roda fora da thread principal:
+ * o deslize não trava enquanto a tela nova é montada.
+ */
 .tab-pill {
   position: absolute;
   top: 8px;
   left: 0;
   height: 48px;
-  border-radius: 24px;
-  background: rgba(255, 255, 255, 0.12);
+  /* Partes brancas opacas e a transparência no grupo: sem emenda visível entre elas */
+  opacity: 0.12;
   pointer-events: none;
+  transition: opacity 0.2s ease;
 }
-.tab-pill[data-animate='true'] {
-  transition:
-    transform 0.4s var(--ease-sheet),
-    width 0.4s var(--ease-sheet),
-    opacity 0.2s ease;
+.pill-cap,
+.pill-mid {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 48px;
+  background: #ffffff;
+  transform-origin: 0 0;
+  will-change: transform;
 }
-/* 4 abas: as inativas ficam só com o ícone (44px), a ativa mostra o nome */
+.pill-cap { width: 24px; border-radius: 24px 0 0 24px; }
+.pill-cap-r { border-radius: 0 24px 24px 0; }
+.pill-mid { width: 1px; }
 .tab {
+  position: absolute;
+  top: 8px;
+  left: 0;
+  z-index: 1;
   display: flex;
   align-items: center;
-  /* Sem gap: o espaço entre ícone e nome fica no .lb, só quando ele aparece */
-  gap: 0;
   height: 48px;
-  min-width: 44px;
-  flex-shrink: 0;
-  justify-content: center;
   padding: 0 11px;
   border-radius: 24px;
   color: #8b9099;
-  transition: background 0.35s ease, color 0.35s ease;
+  transition: color 0.35s ease;
+  will-change: transform;
+}
+.tabbar[data-ready='false'] .tab { visibility: hidden; }
+.tabbar[data-animate='true'] .pill-cap,
+.tabbar[data-animate='true'] .pill-mid,
+.tabbar[data-animate='true'] .tab {
+  transition:
+    transform 0.42s var(--ease-sheet),
+    color 0.35s ease;
 }
 .tab .lb {
-  max-width: 0;
-  opacity: 0;
-  overflow: hidden;
+  position: absolute;
+  left: 39px;
+  top: 50%;
+  translate: 0 -50%;
   white-space: nowrap;
   font-size: 13px;
   font-weight: 500;
-  margin-left: 0;
-  transition: max-width 0.4s var(--ease-sheet), opacity 0.25s ease, margin-left 0.4s var(--ease-sheet);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease;
 }
-.tab { position: relative; z-index: 1; }
 .tab svg { transition: transform 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.4); }
 .tab:active svg { transform: scale(0.88); }
-.tab[aria-current='page'] { color: #ffffff; }
-.tab[aria-current='page'] .lb { max-width: 110px; opacity: 1; margin-left: 6px; }
-/* Telas muito estreitas (iPhone SE 1ª geração, zoom de tela): a aba ativa fica só com o ícone */
-.dock-inner { container-type: inline-size; }
-@container (max-width: 340px) {
-  .tab { padding: 0 10px; }
-  .tab[aria-current='page'] .lb { max-width: 0; opacity: 0; margin-left: 0; }
+.tab[data-active='true'] { color: #ffffff; }
+/* O nome aparece quando a aba já está chegando */
+.tab[data-active='true'] .lb { opacity: 1; transition: opacity 0.25s ease 0.12s; }
+.tab .lb[data-hidden='true'] { visibility: hidden; }
+@media (prefers-reduced-motion: reduce) {
+  .tabbar[data-animate='true'] .pill-cap,
+  .tabbar[data-animate='true'] .pill-mid,
+  .tabbar[data-animate='true'] .tab { transition: color 0.2s ease; }
 }
 .fab {
   pointer-events: auto;
