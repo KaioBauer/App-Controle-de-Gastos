@@ -1,0 +1,5 @@
+# Desenvolvimento: expõe o Postgres para rodar API e web fora do Docker (pnpm dev)
+services:
+  db:
+    ports:
+      - '127.0.0.1:5432:5432'

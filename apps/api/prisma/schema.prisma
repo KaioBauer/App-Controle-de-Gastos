@@ -1,0 +1,211 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// App de usuário único, mas o modelo mantém a relação para sessões e passkeys.
+model User {
+  id           String    @id @default(uuid())
+  username     String    @unique
+  passwordHash String
+  createdAt    DateTime  @default(now())
+  sessions     Session[]
+}
+
+model Session {
+  // Guardamos apenas o hash SHA-256 do token do cookie
+  id         String   @id
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userAgent  String?
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+  expiresAt  DateTime
+
+  @@index([userId])
+}
+
+model PushSubscription {
+  id            String    @id @default(uuid())
+  endpoint      String    @unique
+  p256dh        String
+  auth          String
+  userAgent     String?
+  createdAt     DateTime  @default(now())
+  lastSuccessAt DateTime?
+  lastErrorAt   DateTime?
+  lastError     String?
+}
+
+enum CategoryKind {
+  EXPENSE
+  INCOME
+  TRANSFER
+}
+
+model Category {
+  id           String        @id @default(uuid())
+  name         String        @unique
+  // Chave do ícone no frontend (ex.: "food", "bus", "cart")
+  icon         String
+  kind         CategoryKind  @default(EXPENSE)
+  isDefault    Boolean       @default(false)
+  sortOrder    Int           @default(0)
+  createdAt    DateTime      @default(now())
+  transactions Transaction[]
+  budget       Budget?
+}
+
+enum AccountType {
+  BANK
+  CREDIT
+  INVESTMENT
+  CASH
+}
+
+// Conexão do Meu Pluggy (o id é o itemId da Pluggy)
+model PluggyItem {
+  id               String    @id
+  connectorName    String    @default("")
+  connectorImage   String?
+  // UPDATED, UPDATING, LOGIN_ERROR, OUTDATED, WAITING_USER_INPUT...
+  status           String    @default("")
+  executionStatus  String    @default("")
+  errorMessage     String?
+  consentExpiresAt DateTime?
+  // Última atualização feita pela Pluggy junto ao banco
+  lastUpdatedAt    DateTime?
+  // Última vez que copiamos os dados para cá
+  lastSyncAt       DateTime?
+  lastSyncError    String?
+  createdAt        DateTime  @default(now())
+  accounts         Account[]
+  investments      Investment[]
+}
+
+model Account {
+  id               String           @id @default(uuid())
+  name             String
+  type             AccountType
+  // CHECKING_ACCOUNT, SAVINGS_ACCOUNT, CREDIT_CARD
+  subtype          String?
+  number           String?
+  itemId           String?
+  item             PluggyItem?      @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  // Vazio para contas manuais (dinheiro em espécie)
+  pluggyAccountId  String?          @unique
+  // Saldo informado pela Pluggy (no cartão: valor da fatura em aberto); contas manuais somam as transações
+  balanceCents     BigInt           @default(0)
+  creditLimitCents BigInt?
+  availableCreditCents BigInt?
+  closeDate        DateTime?
+  dueDate          DateTime?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @default(now()) @updatedAt
+  transactions     Transaction[]
+  bills            CreditCardBill[]
+}
+
+model CreditCardBill {
+  // id da fatura na Pluggy
+  id                  String   @id
+  accountId           String
+  account             Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  dueDate             DateTime
+  totalAmountCents    BigInt
+  minimumPaymentCents BigInt?
+  updatedAt           DateTime @updatedAt
+
+  @@index([accountId, dueDate])
+}
+
+model Investment {
+  // id do investimento na Pluggy
+  id           String     @id
+  itemId       String
+  item         PluggyItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  name         String
+  type         String
+  subtype      String?
+  balanceCents BigInt
+  updatedAt    DateTime   @updatedAt
+}
+
+// Idempotência dos webhooks (a Pluggy pode reenviar o mesmo evento)
+model WebhookEvent {
+  eventId    String   @id
+  event      String
+  itemId     String?
+  receivedAt DateTime @default(now())
+}
+
+model Transaction {
+  id          String    @id @default(uuid())
+  accountId   String
+  account     Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  // Chave de deduplicação do sync; vazio em lançamentos manuais
+  pluggyId    String?   @unique
+  // Negativo = saída, positivo = entrada
+  amountCents BigInt
+  date        DateTime
+  // Data no fuso America/Sao_Paulo (YYYY-MM-DD): base de todos os agrupamentos
+  localDate   String
+  description String
+  merchant    String?
+  categoryId  String?
+  category    Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  // Categoria original da Pluggy (base do mapeamento automático)
+  pluggyCategory String?
+  // true quando o usuário escolheu a categoria: o sync não sobrescreve
+  categoryLocked Boolean @default(false)
+  // PENDING ou POSTED (Pluggy)
+  status      String?
+  installmentNumber Int?
+  totalInstallments Int?
+  // Fatura fechada à qual a compra pertence (só vem em transações POSTED do cartão)
+  billId      String?
+  // Data da compra original de um parcelamento (YYYY-MM-DD): agrupa as parcelas
+  purchaseDate String?
+  isTransfer  Boolean   @default(false)
+  reviewed    Boolean   @default(false)
+  notes       String?
+  tags        String[]  @default([])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  @@index([localDate])
+  @@index([categoryId, localDate])
+  @@index([accountId, localDate])
+  @@index([billId])
+}
+
+// Limite mensal recorrente por categoria
+model Budget {
+  id         String   @id @default(uuid())
+  categoryId String   @unique
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  limitCents BigInt
+  createdAt  DateTime @default(now())
+}
+
+// Linha única (id = 1) com as preferências de notificação
+model NotificationSettings {
+  id                Int     @id @default(1)
+  newTransaction    Boolean @default(true)
+  newTransactionMin BigInt  @default(0) // centavos
+  budget            Boolean @default(true)
+  billsDue          Boolean @default(true)
+  lowBalance        Boolean @default(true)
+  unusualSpending   Boolean @default(true)
+  weeklySummary     Boolean @default(true)
+  monthlySummary    Boolean @default(true)
+  syncErrors        Boolean @default(true)
+  quietStart        String? // "22:00"
+  quietEnd          String? // "07:00"
+}

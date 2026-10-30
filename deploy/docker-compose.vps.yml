@@ -1,0 +1,16 @@
+# VPS Hostinger: o proxy 80/443 é o container "proxy" (/opt/proxy), na rede "proxy".
+# Uso (em /opt/kaixa):
+#   docker compose -p kaixa -f docker-compose.yml -f deploy/docker-compose.vps.yml up -d --build
+services:
+  web:
+    container_name: kaixa-web
+    # Sem porta publicada: só o proxy alcança o app, pela rede compartilhada
+    ports: !reset []
+    networks:
+      - default
+      - proxy
+
+networks:
+  proxy:
+    name: proxy
+    external: true
