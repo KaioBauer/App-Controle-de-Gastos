@@ -1,7 +1,7 @@
 import { buildApp } from './app';
 import { loadEnv } from './env';
 import { startScheduler } from './jobs/scheduler';
-import { prisma } from './lib/db';
+import { forEachUser, prisma } from './lib/db';
 import { autoPayBills } from './modules/finance/bills';
 import { ensureDefaults } from './modules/finance/defaults';
 import { Notifier } from './modules/notifications/service';
@@ -10,9 +10,15 @@ import { onSyncFinished, settleOwnTransfers } from './modules/pluggy/sync';
 import { createWebPushSender } from './modules/push/service';
 
 const env = loadEnv();
-await ensureDefaults();
-// Corrige dados já sincronizados com a regra atual de transferências próprias
-await settleOwnTransfers();
+// Para cada usuário: categorias e conta "Dinheiro" (idempotente) e a regra atual de
+// transferências próprias aplicada aos dados já sincronizados
+await forEachUser(
+  async () => {
+    await ensureDefaults();
+    await settleOwnTransfers();
+  },
+  (err, userId) => console.error('Falha ao preparar os dados do usuário', userId, err),
+);
 const pluggy =
   env.PLUGGY_CLIENT_ID && env.PLUGGY_CLIENT_SECRET ? new PluggyClient(env.PLUGGY_CLIENT_ID, env.PLUGGY_CLIENT_SECRET) : null;
 const app = await buildApp(env, pluggy);

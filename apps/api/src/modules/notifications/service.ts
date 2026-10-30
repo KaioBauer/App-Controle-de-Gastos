@@ -16,7 +16,7 @@ import {
   type NotificationToggles,
 } from '../../domain/notifications';
 import { incomeOf, spendingByCategory, spendingOf, sumSpending } from '../../domain/spending';
-import { prisma } from '../../lib/db';
+import { currentUserId, prisma } from '../../lib/db';
 import { loadBills } from '../finance/bills';
 import { flowTxs, unreviewedCount } from '../finance/queries';
 import { loadBudgets } from '../finance/routes';
@@ -28,8 +28,10 @@ const MAX_QUEUE_AGE_MS = 24 * 60 * 60 * 1000;
 /** Histórico usado para saber o que é um gasto "normal" na categoria */
 const UNUSUAL_HISTORY_DAYS = 120;
 
+/** Preferências do usuário do contexto (criadas com os padrões na primeira vez). */
 export function getSettings(): Promise<NotificationSettings> {
-  return prisma.notificationSettings.upsert({ where: { id: 1 }, create: { id: 1 }, update: {} });
+  const userId = currentUserId();
+  return prisma.notificationSettings.upsert({ where: { userId }, create: { userId }, update: {} });
 }
 
 function toggles(s: NotificationSettings): NotificationToggles {
@@ -45,6 +47,10 @@ function toggles(s: NotificationSettings): NotificationToggles {
   };
 }
 
+/**
+ * Avisos do usuário do contexto: fila, preferências e aparelhos são todos dele.
+ * Os jobs agendados chamam cada método uma vez por usuário (ver jobs/scheduler.ts).
+ */
 export class Notifier {
   constructor(
     private send: Sender,
@@ -57,7 +63,7 @@ export class Notifier {
     const enabled = enabledOnly(notices, toggles(settings));
     if (enabled.length) {
       await prisma.notificationOutbox.createMany({
-        data: enabled.map((n) => ({ dedupeKey: n.dedupeKey, type: n.type, title: n.title, body: n.body, url: n.url })),
+        data: enabled.map((n) => ({ userId: currentUserId(), dedupeKey: n.dedupeKey, type: n.type, title: n.title, body: n.body, url: n.url })),
         skipDuplicates: true,
       });
     }

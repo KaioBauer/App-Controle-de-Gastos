@@ -4,7 +4,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { buildAnalysis, periodRange } from '../../domain/analysis';
 import { budgetProgress, incomeOf, spendingByCategory, sumSpending } from '../../domain/spending';
-import { prisma } from '../../lib/db';
+import { currentUserId, prisma } from '../../lib/db';
 import { requireAuth } from '../../plugins/session';
 import { balanceCents, flowTxs, toCategoryDTO, toTransactionDTO, txInclude } from './queries';
 
@@ -107,7 +107,7 @@ export async function financeRoutes(app: FastifyInstance) {
     if (!category || category.kind !== 'EXPENSE') return reply.code(400).send({ error: 'Categoria inválida' });
     await prisma.budget.upsert({
       where: { categoryId },
-      create: { categoryId, limitCents: BigInt(body.data.limitCents) },
+      create: { userId: currentUserId(), categoryId, limitCents: BigInt(body.data.limitCents) },
       update: { limitCents: BigInt(body.data.limitCents) },
     });
     return { ok: true };

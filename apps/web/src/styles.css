@@ -670,3 +670,6 @@ a.item:active { background: var(--fill); }
 .lock-screen { position: fixed; inset: 0; z-index: 100; overflow-y: auto; }
 html.app-locked body > *:not(.lock-screen) { visibility: hidden !important; }
 html.app-locked body { overflow: hidden; }
+/* Em Ajustes a barra desce e some (volta deslizando ao sair) */
+.dock { transition: transform 0.35s var(--ease-sheet), opacity 0.25s ease; }
+.dock[data-hidden='true'] { transform: translateY(calc(100% + 40px)); opacity: 0; }

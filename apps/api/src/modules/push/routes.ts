@@ -2,7 +2,7 @@ import { formatBRL } from '@financas/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { Env } from '../../env';
-import { prisma } from '../../lib/db';
+import { asSystem, currentUserId, prisma } from '../../lib/db';
 import { requireAuth } from '../../plugins/session';
 import { unreviewedCount } from '../finance/queries';
 import { createWebPushSender, sendToAll } from './service';
@@ -26,9 +26,12 @@ export async function pushRoutes(app: FastifyInstance, { env }: { env: Env }) {
       const body = subscribeBody.safeParse(request.body);
       if (!body.success) return reply.code(400).send({ error: 'Inscrição inválida' });
       const { endpoint, keys } = body.data;
+      const userId = currentUserId();
+      // O aparelho passou a ser de outra pessoa (outro login no mesmo iPhone): sai da conta anterior
+      await asSystem(() => prisma.pushSubscription.deleteMany({ where: { endpoint, userId: { not: userId } } }));
       await prisma.pushSubscription.upsert({
         where: { endpoint },
-        create: { endpoint, p256dh: keys.p256dh, auth: keys.auth, userAgent: request.headers['user-agent'] },
+        create: { userId, endpoint, p256dh: keys.p256dh, auth: keys.auth, userAgent: request.headers['user-agent'] },
         update: { p256dh: keys.p256dh, auth: keys.auth, lastError: null, lastErrorAt: null },
       });
       return { ok: true };

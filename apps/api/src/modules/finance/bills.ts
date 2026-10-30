@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { currentOccurrence, findPayment, suggestBills, type BillDef } from '../../domain/bills';
 import type { CardTx } from '../../domain/cards';
 import { merchantKey } from '../../domain/merchant';
-import { prisma } from '../../lib/db';
+import { currentUserId, prisma } from '../../lib/db';
 import { requireAuth } from '../../plugins/session';
 import { buildCards } from './cards';
 import { toCategoryDTO } from './queries';
@@ -74,7 +74,7 @@ export async function autoPayBills(today = localDate(new Date())) {
       if (!txId) break;
       await prisma.billPayment.upsert({
         where: { billId_period: { billId: b.id, period: occ.period } },
-        create: { billId: b.id, period: occ.period, transactionId: txId },
+        create: { userId: currentUserId(), billId: b.id, period: occ.period, transactionId: txId },
         update: {},
       });
       done.add(occ.period);
@@ -173,8 +173,11 @@ export async function billRoutes(app: FastifyInstance) {
     const b = billBody.safeParse(request.body);
     if (!b.success) return reply.code(400).send({ error: b.error.issues[0]?.message ?? 'Dados inválidos' });
     const { matchDescription, matchKey, amountCents, ...rest } = b.data;
+    if (rest.categoryId && !(await prisma.category.findUnique({ where: { id: rest.categoryId } }))) {
+      return reply.code(400).send({ error: 'Categoria não encontrada' });
+    }
     const key = matchKey ?? (matchDescription ? merchantKey(matchDescription) || null : null);
-    const bill = await prisma.bill.create({ data: { ...rest, amountCents: amountCents != null ? BigInt(amountCents) : null, matchKey: key } });
+    const bill = await prisma.bill.create({ data: { ...rest, userId: currentUserId(), amountCents: amountCents != null ? BigInt(amountCents) : null, matchKey: key } });
     return reply.code(201).send({ id: bill.id });
   });
 
@@ -183,6 +186,9 @@ export async function billRoutes(app: FastifyInstance) {
     const b = billBody.safeParse(request.body);
     if (!b.success) return reply.code(400).send({ error: b.error.issues[0]?.message ?? 'Dados inválidos' });
     const { matchDescription: _m, matchKey: _k, amountCents, ...rest } = b.data;
+    if (rest.categoryId && !(await prisma.category.findUnique({ where: { id: rest.categoryId } }))) {
+      return reply.code(400).send({ error: 'Categoria não encontrada' });
+    }
     await prisma.bill.update({ where: { id }, data: { ...rest, amountCents: amountCents != null ? BigInt(amountCents) : null } });
     return { ok: true };
   });
@@ -198,9 +204,11 @@ export async function billRoutes(app: FastifyInstance) {
     const { id } = request.params as { id: string };
     const b = z.object({ period: z.string().regex(YM) }).safeParse(request.body);
     if (!b.success) return reply.code(400).send({ error: 'Período inválido' });
+    // A conta precisa ser do usuário (o filtro por dono vale também aqui)
+    if (!(await prisma.bill.findUnique({ where: { id } }))) return reply.code(404).send({ error: 'Conta não encontrada' });
     await prisma.billPayment.upsert({
       where: { billId_period: { billId: id, period: b.data.period } },
-      create: { billId: id, period: b.data.period },
+      create: { userId: currentUserId(), billId: id, period: b.data.period },
       update: {},
     });
     return { ok: true };
@@ -214,7 +222,8 @@ export async function billRoutes(app: FastifyInstance) {
 
   app.post('/bills/suggestions/:key/dismiss', async (request) => {
     const { key } = request.params as { key: string };
-    await prisma.dismissedSuggestion.upsert({ where: { matchKey: key }, create: { matchKey: key }, update: {} });
+    const userId = currentUserId();
+    await prisma.dismissedSuggestion.upsert({ where: { userId_matchKey: { userId, matchKey: key } }, create: { userId, matchKey: key }, update: {} });
     return { ok: true };
   });
 }

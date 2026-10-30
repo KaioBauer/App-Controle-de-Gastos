@@ -1,6 +1,6 @@
 import type { CategoryKind } from '@prisma/client';
 import { merchantKey } from '../../domain/merchant';
-import { prisma } from '../../lib/db';
+import { currentUserId, prisma } from '../../lib/db';
 
 const DEFAULT_CATEGORIES: { name: string; icon: string; kind: CategoryKind }[] = [
   { name: 'Alimentação', icon: 'food', kind: 'EXPENSE' },
@@ -20,19 +20,20 @@ const DEFAULT_CATEGORIES: { name: string; icon: string; kind: CategoryKind }[] =
 
 export const CASH_ACCOUNT_NAME = 'Dinheiro';
 
-/** Cria categorias padrão e a conta de dinheiro em espécie (idempotente, roda no start). */
+/** Cria as categorias padrão e a conta de dinheiro do usuário do contexto (idempotente). */
 export async function ensureDefaults() {
+  const userId = currentUserId();
   await prisma.$transaction(
     DEFAULT_CATEGORIES.map((c, i) =>
       prisma.category.upsert({
-        where: { name: c.name },
-        create: { ...c, isDefault: true, sortOrder: i },
+        where: { userId_name: { userId, name: c.name } },
+        create: { ...c, userId, isDefault: true, sortOrder: i },
         update: {},
       }),
     ),
   );
   const cash = await prisma.account.findFirst({ where: { type: 'CASH' } });
-  if (!cash) await prisma.account.create({ data: { name: CASH_ACCOUNT_NAME, type: 'CASH' } });
+  if (!cash) await prisma.account.create({ data: { userId, name: CASH_ACCOUNT_NAME, type: 'CASH' } });
   await backfillMerchantKeys();
 }
 

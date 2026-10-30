@@ -2,7 +2,7 @@ import type { NotificationSettingsDTO } from '@financas/shared';
 import type { NotificationSettings } from '@prisma/client';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { prisma } from '../../lib/db';
+import { currentUserId, prisma } from '../../lib/db';
 import { requireAuth } from '../../plugins/session';
 import { getSettings } from './service';
 
@@ -52,7 +52,8 @@ export async function notificationRoutes(app: FastifyInstance) {
     // Horário de silêncio só vale com início e fim
     const quiet = quietStart && quietEnd ? { quietStart, quietEnd } : { quietStart: null, quietEnd: null };
     const data = { ...flags, ...quiet, newTransactionMin: BigInt(newTransactionMinCents), lowBalanceCents: BigInt(lowBalanceCents) };
-    const s = await prisma.notificationSettings.upsert({ where: { id: 1 }, create: { id: 1, ...data }, update: data });
+    const userId = currentUserId();
+    const s = await prisma.notificationSettings.upsert({ where: { userId }, create: { userId, ...data }, update: data });
     return toDTO(s);
   });
 }

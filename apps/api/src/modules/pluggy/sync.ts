@@ -10,7 +10,7 @@ import {
   signedCents,
   unmatchedOwnTransfers,
 } from '../../domain/pluggy-mapping';
-import { prisma } from '../../lib/db';
+import { asSystem, currentUserId, prisma, runAsUser } from '../../lib/db';
 import type { PluggyAccount, PluggyClient, PluggyTransaction } from './client';
 
 /** Na primeira sincronização trazemos 12 meses (o máximo usual do Open Finance). */
@@ -31,16 +31,23 @@ export interface SyncResult {
 // Um sync por item por vez (instância única da API)
 const running = new Map<string, Promise<SyncResult>>();
 
+/** Sincroniza um item no contexto do dono dele (webhook e job não têm usuário). */
 export function syncItem(client: PluggyClient, itemId: string, log: FastifyBaseLogger): Promise<SyncResult> {
   const current = running.get(itemId);
   if (current) return current;
-  const p = doSync(client, itemId, log).finally(() => running.delete(itemId));
+  const p = asSystem(() => prisma.pluggyItem.findUnique({ where: { id: itemId }, select: { userId: true } }))
+    .then((owner) => {
+      if (!owner) throw new Error(`Item ${itemId} não cadastrado`);
+      return runAsUser(owner.userId, () => doSync(client, itemId, log));
+    })
+    .finally(() => running.delete(itemId));
   running.set(itemId, p);
   return p;
 }
 
 export async function syncAll(client: PluggyClient, log: FastifyBaseLogger) {
-  const items = await prisma.pluggyItem.findMany({ select: { id: true } });
+  // Itens de todos os usuários; cada sync roda no contexto do dono
+  const items = await asSystem(() => prisma.pluggyItem.findMany({ select: { id: true } }));
   const results: SyncResult[] = [];
   for (const { id } of items) {
     try {
@@ -156,7 +163,7 @@ async function upsertAccount(itemId: string, acc: PluggyAccount): Promise<string
   };
   const row = await prisma.account.upsert({
     where: { pluggyAccountId: acc.id },
-    create: { ...data, pluggyAccountId: acc.id },
+    create: { ...data, userId: currentUserId(), pluggyAccountId: acc.id },
     update: data,
   });
   return row.id;
@@ -237,6 +244,7 @@ async function applyTransactions(
       const row = await db.transaction.upsert({
         where: { pluggyId },
         create: {
+          userId: currentUserId(),
           accountId,
           pluggyId,
           ...bankFields(t),
@@ -288,7 +296,7 @@ async function syncBills(client: PluggyClient, accountId: string, pluggyAccountI
       totalAmountCents: BigInt(toCents(b.totalAmount)),
       minimumPaymentCents: b.minimumPaymentAmount != null ? BigInt(toCents(b.minimumPaymentAmount)) : null,
     };
-    await prisma.creditCardBill.upsert({ where: { id: b.id }, create: { id: b.id, ...data }, update: data });
+    await prisma.creditCardBill.upsert({ where: { id: b.id }, create: { id: b.id, userId: currentUserId(), ...data }, update: data });
   }
 }
 
@@ -296,7 +304,7 @@ async function syncInvestments(client: PluggyClient, itemId: string) {
   const investments = await client.listInvestments(itemId);
   for (const inv of investments) {
     const data = { itemId, name: inv.name, type: inv.type, subtype: inv.subtype, balanceCents: BigInt(toCents(inv.balance)) };
-    await prisma.investment.upsert({ where: { id: inv.id }, create: { id: inv.id, ...data }, update: data });
+    await prisma.investment.upsert({ where: { id: inv.id }, create: { id: inv.id, userId: currentUserId(), ...data }, update: data });
   }
 }
 

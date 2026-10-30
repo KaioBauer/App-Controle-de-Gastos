@@ -1,6 +1,6 @@
 #!/bin/sh
 # Envia uma notificação push para os aparelhos do Kaixa em produção, a partir do seu PC.
-#   deploy/push.sh "Título" "Mensagem" [--url /contas]
+#   deploy/push.sh --usuario kaio "Título" "Mensagem" [--url /contas]
 #   deploy/push.sh --listar
 # Usa o acesso SSH à VPS (root@2.24.114.161) e roda o comando dentro do container da API.
 set -eu

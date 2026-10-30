@@ -1,7 +1,7 @@
 import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
-import Fastify from 'fastify';
+import Fastify, { type FastifyError } from 'fastify';
 import type { Env } from './env';
 import { passkeyRoutes } from './modules/auth/passkeys';
 import { authRoutes } from './modules/auth/routes';
@@ -33,6 +33,14 @@ export async function buildApp(env: Env, pluggy: PluggyClient | null) {
   app.setReplySerializer((payload) =>
     JSON.stringify(payload, (_k, v) => (typeof v === 'bigint' ? Number(v) : v)),
   );
+
+  // Registro inexistente (ou de outro usuário, que o filtro por dono esconde): 404, não 500
+  app.setErrorHandler((err: FastifyError, request, reply) => {
+    if (err.code === 'P2025') return reply.code(404).send({ error: 'Não encontrado' });
+    const status = err.statusCode && err.statusCode >= 400 ? err.statusCode : 500;
+    if (status >= 500) request.log.error({ err }, 'Erro na requisição');
+    return reply.code(status).send({ error: status >= 500 ? 'Erro interno' : err.message });
+  });
 
   await app.register(cookie);
   await app.register(cors, { origin: env.APP_ORIGIN, credentials: true });

@@ -3,7 +3,7 @@ import { localDate } from '@financas/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { goalProgress } from '../../domain/goals';
-import { prisma } from '../../lib/db';
+import { currentUserId, prisma } from '../../lib/db';
 import { requireAuth } from '../../plugins/session';
 
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
@@ -47,7 +47,7 @@ export async function goalRoutes(app: FastifyInstance) {
   app.post('/goals', async (request, reply) => {
     const b = goalBody.safeParse(request.body);
     if (!b.success) return reply.code(400).send({ error: 'Dados inválidos' });
-    const g = await prisma.goal.create({ data: { ...b.data, targetCents: BigInt(b.data.targetCents) } });
+    const g = await prisma.goal.create({ data: { ...b.data, userId: currentUserId(), targetCents: BigInt(b.data.targetCents) } });
     return reply.code(201).send({ id: g.id });
   });
 
@@ -77,6 +77,7 @@ export async function goalRoutes(app: FastifyInstance) {
     }
     await prisma.goalContribution.create({
       data: {
+        userId: currentUserId(),
         goalId: id,
         amountCents: BigInt(b.data.kind === 'withdraw' ? -b.data.amountCents : b.data.amountCents),
         localDate: localDate(new Date()),

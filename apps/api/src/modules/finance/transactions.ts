@@ -3,7 +3,7 @@ import { localDate } from '@financas/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { merchantKey } from '../../domain/merchant';
-import { prisma } from '../../lib/db';
+import { currentUserId, prisma } from '../../lib/db';
 import { requireAuth } from '../../plugins/session';
 import { buildTxWhere, txFilterQuery } from './filters';
 import { toCategoryDTO, toTransactionDTO, txInclude } from './queries';
@@ -118,6 +118,7 @@ export async function transactionRoutes(app: FastifyInstance) {
     const text = description || category.name;
     const tx = await prisma.transaction.create({
       data: {
+        userId: currentUserId(),
         accountId: cash.id,
         amountCents: BigInt(kind === 'expense' ? -amountCents : amountCents),
         // Datas passadas ficam ao meio-dia de Brasília
@@ -176,7 +177,10 @@ export async function transactionRoutes(app: FastifyInstance) {
     if (!tx.merchantKey) return { count: 0, rule: null };
     const [count, rule] = await Promise.all([
       prisma.transaction.count({ where: similarWhere(id, tx.merchantKey) }),
-      prisma.categoryRule.findUnique({ where: { pattern: tx.merchantKey }, include: { category: true } }),
+      prisma.categoryRule.findUnique({
+        where: { userId_pattern: { userId: currentUserId(), pattern: tx.merchantKey } },
+        include: { category: true },
+      }),
     ]);
     return { count, rule: rule ? { id: rule.id, category: toCategoryDTO(rule.category) } : null };
   });
@@ -215,9 +219,10 @@ export async function transactionRoutes(app: FastifyInstance) {
       if (createRule && key) {
         // "Compra no débito|COOPERALFA ITAIOPOLIS" -> "COOPERALFA ITAIOPOLIS"
         const label = tx.description.split('|').pop()!.trim() || tx.description;
+        const userId = currentUserId();
         await db.categoryRule.upsert({
-          where: { pattern: key },
-          create: { pattern: key, label, categoryId },
+          where: { userId_pattern: { userId, pattern: key } },
+          create: { userId, pattern: key, label, categoryId },
           update: { categoryId, label },
         });
       }

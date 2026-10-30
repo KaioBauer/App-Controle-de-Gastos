@@ -4,7 +4,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { connectionHealth } from '../../domain/connection-health';
 import type { Env } from '../../env';
-import { prisma } from '../../lib/db';
+import { asSystem, currentUserId, prisma } from '../../lib/db';
 import { requireAuth } from '../../plugins/session';
 import { PluggyError, type PluggyClient } from './client';
 import { syncAll, syncItem } from './sync';
@@ -61,13 +61,16 @@ export async function pluggyRoutes(app: FastifyInstance, { env, client }: { env:
 
       // Responde já (a Pluggy espera 2xx em até 10s) e sincroniza em segundo plano
       if (client && itemId && SYNC_EVENTS.has(event)) {
-        const known = await prisma.pluggyItem.findUnique({ where: { id: itemId }, select: { id: true } });
+        // O webhook não tem usuário: procura a conexão em todas as contas (o sync roda no dono dela)
+        const known = await asSystem(() => prisma.pluggyItem.findUnique({ where: { id: itemId }, select: { id: true } }));
         if (known) {
           syncItem(client, itemId, request.log).catch((err) => request.log.error({ err, itemId, event }, 'Sync via webhook falhou'));
         }
       }
       if (itemId && event === 'item/deleted') {
-        await prisma.pluggyItem.updateMany({ where: { id: itemId }, data: { status: 'DELETED', errorMessage: 'Conexão removida no Meu Pluggy' } });
+        await asSystem(() =>
+          prisma.pluggyItem.updateMany({ where: { id: itemId }, data: { status: 'DELETED', errorMessage: 'Conexão removida no Meu Pluggy' } }),
+        );
       }
       return { ok: true };
     },
@@ -122,7 +125,12 @@ export async function pluggyRoutes(app: FastifyInstance, { env, client }: { env:
         throw err;
       }
 
-      await prisma.pluggyItem.upsert({ where: { id: itemId }, create: { id: itemId }, update: {} });
+      const userId = currentUserId();
+      const owner = await asSystem(() => prisma.pluggyItem.findUnique({ where: { id: itemId }, select: { userId: true } }));
+      if (owner && owner.userId !== userId) {
+        return reply.code(400).send({ error: 'Esta conexão já está cadastrada em outra conta do Kaixa' });
+      }
+      await prisma.pluggyItem.upsert({ where: { id: itemId }, create: { userId, id: itemId }, update: {} });
       try {
         const result = await syncItem(pluggy, itemId, request.log);
         return reply.code(201).send(result);

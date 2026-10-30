@@ -67,11 +67,13 @@ ssh root@2.24.114.161 "cd /opt/kaixa && docker compose -p kaixa -f docker-compos
 
 As migrations rodam sozinhas no start da API. O `.env` de produção fica só na VPS (`/opt/kaixa/.env`, permissão 600).
 
-**Criar/redefinir o usuário de login:**
+**Usuários:** cada usuário tem os próprios dados (conexões do Meu Pluggy, contas, transações, categorias, orçamentos, avisos e aparelhos). O isolamento fica em `apps/api/src/lib/db.ts`: toda consulta às tabelas com dono recebe o filtro do usuário da sessão. Para criar um usuário novo ou redefinir uma senha:
 
 ```bash
 ssh -t root@2.24.114.161 "cd /opt/kaixa && docker compose -p kaixa exec api node dist/cli/create-user.js"
 ```
+
+**Push pelo terminal:** `deploy/push.sh --listar` mostra os usuários e aparelhos; `deploy/push.sh --usuario <nome> "Título" "Mensagem" [--url /contas]` envia para uma pessoa.
 
 **Proxy:** o bloco do Kaixa está em `deploy/nginx.vps.conf`, instalado como `/opt/proxy/sites/kaixa.conf`. Depois de mudar, rode `docker exec proxy nginx -t && docker exec proxy nginx -s reload`. O certificado renova sozinho por webroot, sem derrubar o proxy.
 

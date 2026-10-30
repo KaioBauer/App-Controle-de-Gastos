@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { prisma } from '../../lib/db';
+import { currentUserId, prisma } from '../../lib/db';
 import { requireAuth } from '../../plugins/session';
 import { toCategoryDTO } from './queries';
 
@@ -25,7 +25,7 @@ export async function categoryRoutes(app: FastifyInstance) {
     const exists = await prisma.category.findFirst({ where: { name: { equals: b.data.name, mode: 'insensitive' } } });
     if (exists) return reply.code(400).send({ error: 'Já existe uma categoria com esse nome' });
     const max = await prisma.category.aggregate({ _max: { sortOrder: true } });
-    const c = await prisma.category.create({ data: { ...b.data, sortOrder: (max._max.sortOrder ?? 0) + 1 } });
+    const c = await prisma.category.create({ data: { ...b.data, userId: currentUserId(), sortOrder: (max._max.sortOrder ?? 0) + 1 } });
     return reply.code(201).send(toCategoryDTO(c));
   });
 

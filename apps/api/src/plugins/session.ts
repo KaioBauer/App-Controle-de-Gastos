@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { Env } from '../env';
-import { prisma } from '../lib/db';
+import { enterUserScope, prisma } from '../lib/db';
 
 export const SESSION_COOKIE = 'sid';
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -75,6 +75,9 @@ export function registerSession(app: FastifyInstance, env: Env) {
       reply.setCookie(SESSION_COOKIE, token, cookieOptions(env, env.SESSION_DAYS * 24 * 60 * 60));
     }
   });
+
+  // Daqui em diante, toda consulta da requisição enxerga só os dados deste usuário (ver lib/db.ts)
+  app.addHook('preHandler', (request, _reply, done) => enterUserScope(request.userId, done));
 }
 
 /** Sessão desbloqueada: exigido por todas as rotas com dados. */

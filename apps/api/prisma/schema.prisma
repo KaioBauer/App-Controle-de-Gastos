@@ -8,16 +8,32 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// App de usuário único, mas o modelo mantém a relação para sessões e passkeys.
+// Cada usuário tem os próprios dados (contas, transações, categorias, avisos...).
 model User {
-  id           String    @id @default(uuid())
-  username     String    @unique
-  passwordHash String
+  id                   String                @id @default(uuid())
+  username             String                @unique
+  passwordHash         String
   // Pede Face ID ao abrir e ao voltar para o app (liga sozinho ao cadastrar uma passkey)
-  appLock      Boolean   @default(false)
-  createdAt    DateTime  @default(now())
-  sessions     Session[]
-  passkeys     Passkey[]
+  appLock              Boolean               @default(false)
+  createdAt            DateTime              @default(now())
+  sessions             Session[]
+  passkeys             Passkey[]
+  pushSubscriptions    PushSubscription[]
+  categories           Category[]
+  categoryRules        CategoryRule[]
+  pluggyItems          PluggyItem[]
+  accounts             Account[]
+  creditCardBills      CreditCardBill[]
+  investments          Investment[]
+  goals                Goal[]
+  goalContributions    GoalContribution[]
+  bills                Bill[]
+  billPayments         BillPayment[]
+  dismissedSuggestions DismissedSuggestion[]
+  transactions         Transaction[]
+  budgets              Budget[]
+  notificationSettings NotificationSettings?
+  notificationOutbox   NotificationOutbox[]
 }
 
 // Passkey (Face ID / Touch ID / chave de segurança) para entrar sem senha
@@ -39,12 +55,12 @@ model Passkey {
 
 model Session {
   // Guardamos apenas o hash SHA-256 do token do cookie
-  id         String   @id
+  id         String    @id
   userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   userAgent  String?
-  createdAt  DateTime @default(now())
-  lastSeenAt DateTime @default(now())
+  createdAt  DateTime  @default(now())
+  lastSeenAt DateTime  @default(now())
   expiresAt  DateTime
   // App foi para o segundo plano: a API recusa dados até desbloquear com Face ID ou senha
   lockedAt   DateTime?
@@ -54,6 +70,9 @@ model Session {
 
 model PushSubscription {
   id            String    @id @default(uuid())
+  // Dono do dado: cada usuário só enxerga o que é seu
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   endpoint      String    @unique
   p256dh        String
   auth          String
@@ -62,6 +81,8 @@ model PushSubscription {
   lastSuccessAt DateTime?
   lastErrorAt   DateTime?
   lastError     String?
+
+  @@index([userId])
 }
 
 enum CategoryKind {
@@ -71,30 +92,40 @@ enum CategoryKind {
 }
 
 model Category {
-  id           String        @id @default(uuid())
-  name         String        @unique
+  id           String         @id @default(uuid())
+  // Dono do dado: cada usuário só enxerga o que é seu
+  userId       String
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name         String
   // Chave do ícone no frontend (ex.: "food", "bus", "cart")
   icon         String
-  kind         CategoryKind  @default(EXPENSE)
-  isDefault    Boolean       @default(false)
-  sortOrder    Int           @default(0)
-  createdAt    DateTime      @default(now())
+  kind         CategoryKind   @default(EXPENSE)
+  isDefault    Boolean        @default(false)
+  sortOrder    Int            @default(0)
+  createdAt    DateTime       @default(now())
   transactions Transaction[]
   budget       Budget?
   rules        CategoryRule[]
   bills        Bill[]
+
+  @@unique([userId, name])
 }
 
 // "Sempre categorizar <estabelecimento> como <categoria>": vale para o sync da Pluggy
 model CategoryRule {
   id         String   @id @default(uuid())
+  // Dono do dado: cada usuário só enxerga o que é seu
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   // Chave normalizada do estabelecimento (ver domain/merchant.ts)
-  pattern    String   @unique
+  pattern    String
   // Descrição original usada para criar a regra (para exibir)
   label      String
   categoryId String
   category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   createdAt  DateTime @default(now())
+
+  @@unique([userId, pattern])
 }
 
 enum AccountType {
@@ -106,12 +137,15 @@ enum AccountType {
 
 // Conexão do Meu Pluggy (o id é o itemId da Pluggy)
 model PluggyItem {
-  id               String    @id
-  connectorName    String    @default("")
+  id               String       @id
+  // Dono do dado: cada usuário só enxerga o que é seu
+  userId           String
+  user             User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  connectorName    String       @default("")
   connectorImage   String?
   // UPDATED, UPDATING, LOGIN_ERROR, OUTDATED, WAITING_USER_INPUT...
-  status           String    @default("")
-  executionStatus  String    @default("")
+  status           String       @default("")
+  executionStatus  String       @default("")
   errorMessage     String?
   consentExpiresAt DateTime?
   // Última atualização feita pela Pluggy junto ao banco
@@ -119,36 +153,46 @@ model PluggyItem {
   // Última vez que copiamos os dados para cá
   lastSyncAt       DateTime?
   lastSyncError    String?
-  createdAt        DateTime  @default(now())
+  createdAt        DateTime     @default(now())
   accounts         Account[]
   investments      Investment[]
+
+  @@index([userId])
 }
 
 model Account {
-  id               String           @id @default(uuid())
-  name             String
-  type             AccountType
+  id                   String           @id @default(uuid())
+  // Dono do dado: cada usuário só enxerga o que é seu
+  userId               String
+  user                 User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name                 String
+  type                 AccountType
   // CHECKING_ACCOUNT, SAVINGS_ACCOUNT, CREDIT_CARD
-  subtype          String?
-  number           String?
-  itemId           String?
-  item             PluggyItem?      @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  subtype              String?
+  number               String?
+  itemId               String?
+  item                 PluggyItem?      @relation(fields: [itemId], references: [id], onDelete: Cascade)
   // Vazio para contas manuais (dinheiro em espécie)
-  pluggyAccountId  String?          @unique
+  pluggyAccountId      String?          @unique
   // Saldo informado pela Pluggy (no cartão: valor da fatura em aberto); contas manuais somam as transações
-  balanceCents     BigInt           @default(0)
-  creditLimitCents BigInt?
+  balanceCents         BigInt           @default(0)
+  creditLimitCents     BigInt?
   availableCreditCents BigInt?
-  closeDate        DateTime?
-  dueDate          DateTime?
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @default(now()) @updatedAt
-  transactions     Transaction[]
-  bills            CreditCardBill[]
+  closeDate            DateTime?
+  dueDate              DateTime?
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @default(now()) @updatedAt
+  transactions         Transaction[]
+  bills                CreditCardBill[]
+
+  @@index([userId])
 }
 
 model CreditCardBill {
   // id da fatura na Pluggy
+  // Dono do dado: cada usuário só enxerga o que é seu
+  userId              String
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   id                  String   @id
   accountId           String
   account             Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
@@ -158,10 +202,14 @@ model CreditCardBill {
   updatedAt           DateTime @updatedAt
 
   @@index([accountId, dueDate])
+  @@index([userId])
 }
 
 model Investment {
   // id do investimento na Pluggy
+  // Dono do dado: cada usuário só enxerga o que é seu
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   id           String     @id
   itemId       String
   item         PluggyItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
@@ -170,11 +218,16 @@ model Investment {
   subtype      String?
   balanceCents BigInt
   updatedAt    DateTime   @updatedAt
+
+  @@index([userId])
 }
 
 // Meta de economia com aportes manuais
 model Goal {
   id            String             @id @default(uuid())
+  // Dono do dado: cada usuário só enxerga o que é seu
+  userId        String
+  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   name          String
   targetCents   BigInt
   // Prazo opcional (YYYY-MM-DD)
@@ -182,10 +235,15 @@ model Goal {
   icon          String             @default("target")
   createdAt     DateTime           @default(now())
   contributions GoalContribution[]
+
+  @@index([userId])
 }
 
 model GoalContribution {
   id          String   @id @default(uuid())
+  // Dono do dado: cada usuário só enxerga o que é seu
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   goalId      String
   goal        Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
   // Positivo = aporte, negativo = retirada
@@ -194,11 +252,15 @@ model GoalContribution {
   createdAt   DateTime @default(now())
 
   @@index([goalId, localDate])
+  @@index([userId])
 }
 
 // Conta a pagar: mensal (dueDay) ou única (dueDate)
 model Bill {
   id          String        @id @default(uuid())
+  // Dono do dado: cada usuário só enxerga o que é seu
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   name        String
   // Valor esperado; null quando varia (ex.: luz)
   amountCents BigInt?
@@ -213,11 +275,16 @@ model Bill {
   active      Boolean       @default(true)
   createdAt   DateTime      @default(now())
   payments    BillPayment[]
+
+  @@index([userId])
 }
 
 // Pagamento de uma ocorrência (mês) de uma conta
 model BillPayment {
   id            String   @id @default(uuid())
+  // Dono do dado: cada usuário só enxerga o que é seu
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   billId        String
   bill          Bill     @relation(fields: [billId], references: [id], onDelete: Cascade)
   // "YYYY-MM" da ocorrência paga
@@ -226,12 +293,19 @@ model BillPayment {
   transactionId String?
 
   @@unique([billId, period])
+  @@index([userId])
 }
 
 // Sugestões de conta recorrente que o usuário dispensou
 model DismissedSuggestion {
-  matchKey  String   @id
+  id        String   @id @default(uuid())
+  matchKey  String
+  // Dono do dado: cada usuário só enxerga o que é seu
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
+
+  @@unique([userId, matchKey])
 }
 
 // Idempotência dos webhooks (a Pluggy pode reenviar o mesmo evento)
@@ -243,64 +317,75 @@ model WebhookEvent {
 }
 
 model Transaction {
-  id          String    @id @default(uuid())
-  accountId   String
-  account     Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  id                String    @id @default(uuid())
+  // Dono do dado: cada usuário só enxerga o que é seu
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountId         String
+  account           Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
   // Chave de deduplicação do sync; vazio em lançamentos manuais
-  pluggyId    String?   @unique
+  pluggyId          String?   @unique
   // Negativo = saída, positivo = entrada
-  amountCents BigInt
-  date        DateTime
+  amountCents       BigInt
+  date              DateTime
   // Data no fuso America/Sao_Paulo (YYYY-MM-DD): base de todos os agrupamentos
-  localDate   String
-  description String
-  merchant    String?
+  localDate         String
+  description       String
+  merchant          String?
   // Chave normalizada do estabelecimento: agrupa "parecidas" e casa com CategoryRule
-  merchantKey String?
-  categoryId  String?
-  category    Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  merchantKey       String?
+  categoryId        String?
+  category          Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   // Categoria original da Pluggy (base do mapeamento automático)
-  pluggyCategory String?
+  pluggyCategory    String?
   // true quando a categoria foi definida pelo usuário (nesta transação ou via "aplicar a parecidas"):
   // o sync não sobrescreve
-  categoryLocked Boolean @default(false)
+  categoryLocked    Boolean   @default(false)
   // true só quando o usuário escolheu a categoria NESTA transação: "aplicar a parecidas" não mexe nela
-  categoryManual Boolean @default(false)
+  categoryManual    Boolean   @default(false)
   // PENDING ou POSTED (Pluggy)
-  status      String?
+  status            String?
   installmentNumber Int?
   totalInstallments Int?
   // Fatura fechada à qual a compra pertence (só vem em transações POSTED do cartão)
-  billId      String?
+  billId            String?
   // Data da compra original de um parcelamento (YYYY-MM-DD): agrupa as parcelas
-  purchaseDate String?
-  isTransfer  Boolean   @default(false)
-  reviewed    Boolean   @default(false)
-  notes       String?
-  tags        String[]  @default([])
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  deletedAt   DateTime?
+  purchaseDate      String?
+  isTransfer        Boolean   @default(false)
+  reviewed          Boolean   @default(false)
+  notes             String?
+  tags              String[]  @default([])
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
 
   @@index([localDate])
   @@index([categoryId, localDate])
   @@index([accountId, localDate])
   @@index([billId])
   @@index([merchantKey])
+  @@index([userId])
 }
 
 // Limite mensal recorrente por categoria
 model Budget {
   id         String   @id @default(uuid())
+  // Dono do dado: cada usuário só enxerga o que é seu
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   categoryId String   @unique
   category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   limitCents BigInt
   createdAt  DateTime @default(now())
+
+  @@index([userId])
 }
 
-// Linha única (id = 1) com as preferências de notificação
+// Preferências de notificação de cada usuário
 model NotificationSettings {
-  id                Int     @id @default(1)
+  // Uma linha por usuário
+  userId            String  @id
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   newTransaction    Boolean @default(true)
   newTransactionMin BigInt  @default(0) // centavos
   budget            Boolean @default(true)
@@ -320,7 +405,10 @@ model NotificationSettings {
 // horário de silêncio. sentAt nulo = ainda na fila.
 model NotificationOutbox {
   id        String    @id @default(uuid())
-  dedupeKey String    @unique
+  // Dono do dado: cada usuário só enxerga o que é seu
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dedupeKey String
   type      String
   title     String
   body      String
@@ -328,5 +416,6 @@ model NotificationOutbox {
   createdAt DateTime  @default(now())
   sentAt    DateTime?
 
+  @@unique([userId, dedupeKey])
   @@index([sentAt])
 }

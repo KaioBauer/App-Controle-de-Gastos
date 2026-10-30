@@ -1,11 +1,13 @@
 import { createInterface } from 'node:readline/promises';
 import argon2 from 'argon2';
-import { prisma } from '../lib/db';
+import { asSystem, prisma, runAsUser } from '../lib/db';
+import { ensureDefaults } from '../modules/finance/defaults';
 
 /**
- * Cria (ou redefine a senha do) usuário único.
+ * Cria um usuário (com dados próprios e separados dos outros) ou redefine a senha de um existente.
  * Uso: pnpm create-user            (interativo)
  *      docker compose exec api node dist/cli/create-user.js   (no servidor)
+ *      deploy/create-user.sh       (do PC, via SSH)
  */
 const rl = createInterface({ input: process.stdin, output: process.stdout });
 const username = process.env.USERNAME_NEW ?? (await rl.question('Usuário: ')).trim();
@@ -18,13 +20,13 @@ if (!username || password.length < 8) {
 }
 
 const passwordHash = await argon2.hash(password, { type: argon2.argon2id });
-const existing = await prisma.user.findFirst();
-if (existing && existing.username !== username) {
-  console.error(`Já existe o usuário "${existing.username}". Este app é de usuário único.`);
-  process.exit(1);
-}
-await prisma.user.upsert({ where: { username }, create: { username, passwordHash }, update: { passwordHash } });
-// Redefinir a senha encerra as sessões abertas
-if (existing) await prisma.session.deleteMany({ where: { userId: existing.id } });
+await asSystem(async () => {
+  const existing = await prisma.user.findUnique({ where: { username } });
+  const user = await prisma.user.upsert({ where: { username }, create: { username, passwordHash }, update: { passwordHash } });
+  // Redefinir a senha encerra as sessões abertas
+  if (existing) await prisma.session.deleteMany({ where: { userId: existing.id } });
+  // Categorias padrão e a conta "Dinheiro" do usuário
+  await runAsUser(user.id, () => ensureDefaults());
+  console.log(existing ? `Senha de "${username}" redefinida.` : `Usuário "${username}" criado, com os próprios dados.`);
+});
 await prisma.$disconnect();
-console.log(`Usuário "${username}" salvo.`);

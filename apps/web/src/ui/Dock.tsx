@@ -90,7 +90,8 @@ export function Dock() {
     setPending(null);
   }, [pathname]);
 
-  const layout = size ? computeLayout(size.bar, size.labels, Math.max(active, 0)) : null;
+  // Fora das abas (Movimentações, Contas…) nenhuma fica aberta: só os ícones
+  const layout = size ? computeLayout(size.bar, size.labels, active) : null;
   const pillX = layout && active >= 0 ? layout.xs[active]! : 0;
   const pillW = layout && active >= 0 ? layout.widths[active]! : ICON_TAB;
 
@@ -112,9 +113,12 @@ export function Dock() {
     setTimeout(run, 50);
   };
 
+  // Ajustes é uma área à parte (abre pelo avatar e tem o próprio voltar): sem barra
+  const hidden = pathname.startsWith('/ajustes');
+
   return (
     <>
-      <div className="dock">
+      <div className="dock" data-hidden={hidden} aria-hidden={hidden} inert={hidden}>
         <div className="dock-inner">
           <nav className="tabbar" aria-label="Navegação principal" ref={nav} data-animate={animate} data-ready={!!layout}>
             {/* Pílula em 3 partes (pontas + miolo esticado): muda de largura só com transform */}
