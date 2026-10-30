@@ -10,7 +10,7 @@ export interface GoalProgress {
   perMonthCents: number | null;
   /** Ritmo médio de aportes desde a criação, por mês */
   paceCents: number;
-  status: 'done' | 'on-track' | 'behind' | 'no-deadline' | 'late';
+  status: 'done' | 'on-track' | 'behind' | 'no-deadline' | 'late' | 'new';
 }
 
 const DAYS_PER_MONTH = 30.44;
@@ -38,6 +38,8 @@ export function goalProgress(
 
   const monthsLeft = Math.max(1, Math.round(daysLeft / DAYS_PER_MONTH));
   const perMonthCents = Math.ceil(remainingCents / monthsLeft);
+  // Sem nenhum aporte ainda não há ritmo para julgar
+  if (contributions.length === 0) return { savedCents, pct, remainingCents, monthsLeft, perMonthCents, paceCents, status: 'new' };
   return {
     savedCents,
     pct,

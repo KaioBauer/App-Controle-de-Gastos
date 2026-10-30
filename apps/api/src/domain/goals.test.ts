@@ -28,6 +28,13 @@ describe('goalProgress', () => {
     expect(late.status).toBe('late');
   });
 
+  it('meta nova, sem aportes, não é julgada como atrasada', () => {
+    const p = goalProgress(goal, [], '2026-04-30');
+    expect(p.status).toBe('new');
+    // 18 meses até out/2027: R$ 12.000 / 18
+    expect(p.perMonthCents).toBe(66_667);
+  });
+
   it('último mês ainda conta como 1 mês para guardar', () => {
     expect(goalProgress({ ...goal, deadline: '2026-11-05' }, [], '2026-10-30').monthsLeft).toBe(1);
   });

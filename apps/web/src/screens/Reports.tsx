@@ -107,8 +107,25 @@ function BalanceLine({ data }: { data: ReportsDTO }) {
           <polygon points={`0,${H} ${line} ${W},${H}`} fill="var(--accent)" opacity="0.12" />
           <polyline points={line} fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" className="dr" />
           {min < 0 && <line x1="0" x2={W} y1={y(0)} y2={y(0)} stroke="var(--c5)" strokeDasharray="4 4" vectorEffect="non-scaling-stroke" />}
-          <circle cx={x(sel)} cy={y(cur.balanceCents)} r="5" fill="var(--accent)" stroke="var(--surface)" strokeWidth="2" vectorEffect="non-scaling-stroke" />
         </svg>
+        {/* Ponto fora do SVG: com preserveAspectRatio="none" um círculo viraria elipse */}
+        <span
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            left: `${(x(sel) / W) * 100}%`,
+            top: y(cur.balanceCents),
+            width: 12,
+            height: 12,
+            marginLeft: -6,
+            marginTop: -6,
+            borderRadius: 6,
+            background: 'var(--accent)',
+            border: '2px solid var(--surface)',
+            transition: 'left .3s var(--ease), top .3s var(--ease)',
+            pointerEvents: 'none',
+          }}
+        />
         {/* Áreas de toque por mês, sobre o gráfico */}
         <div className="row" style={{ position: 'absolute', inset: 0 }}>
           {pts.map((p, i) => (

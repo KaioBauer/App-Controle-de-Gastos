@@ -87,7 +87,9 @@ export async function passkeyRoutes(app: FastifyInstance, { env }: { env: Env })
         requireUserVerification: true,
       });
     } catch (err) {
-      return reply.code(400).send({ error: `Não foi possível cadastrar: ${(err as Error).message}` });
+      // Detalhe técnico só no log: para o usuário, uma mensagem clara
+      request.log.warn({ err }, 'Cadastro de passkey recusado');
+      return reply.code(400).send({ error: 'Não foi possível cadastrar a passkey. Tente de novo.' });
     }
     if (!verification.verified) return reply.code(400).send({ error: 'Não foi possível verificar a passkey' });
     const { credential } = verification.registrationInfo;
@@ -147,7 +149,8 @@ export async function passkeyRoutes(app: FastifyInstance, { env }: { env: Env })
         },
       });
     } catch (err) {
-      return reply.code(401).send({ error: `Não foi possível entrar: ${(err as Error).message}` });
+      request.log.warn({ err }, 'Login com passkey recusado');
+      return reply.code(401).send({ error: 'Não foi possível entrar com a passkey. Tente de novo ou use a senha.' });
     }
     if (!verification.verified) return reply.code(401).send({ error: 'Não foi possível verificar a passkey' });
 

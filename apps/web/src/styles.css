@@ -6,6 +6,7 @@
   --fill: #f2f3f5; /* trilhas, chips e tiles sobre superfícies */
   --track: #e6e8eb; /* fundo do segmented control */
   --seg-on: #ffffff; /* indicador do segmented control */
+  --switch-off: #e6e8eb;
   --ink: #0e0f12;
   --ink-2: #6b7079;
   --ink-3: #8b9099;
@@ -46,6 +47,7 @@
     --fill: #26292f;
     --track: #1a1c21;
     --seg-on: #3a3d44;
+    --switch-off: #3a3d44;
     --ink: #f2f3f5;
     --ink-2: #a3a8b0;
     --ink-3: #8b9099;
@@ -572,7 +574,7 @@ a.item:active { background: var(--fill); }
   width: 51px;
   height: 31px;
   border-radius: 16px;
-  background: var(--track);
+  background: var(--switch-off);
   position: relative;
   transition: background-color 0.2s;
 }

@@ -152,7 +152,7 @@ export interface GoalDTO {
   monthsLeft: number | null;
   perMonthCents: number | null;
   paceCents: number;
-  status: 'done' | 'on-track' | 'behind' | 'no-deadline' | 'late';
+  status: 'done' | 'on-track' | 'behind' | 'no-deadline' | 'late' | 'new';
   contributions: { id: string; amountCents: number; localDate: string }[];
 }
 

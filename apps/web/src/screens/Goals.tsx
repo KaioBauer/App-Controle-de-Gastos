@@ -19,6 +19,7 @@ const STATUS: Record<GoalDTO['status'], { label: string; cls: string }> = {
   behind: { label: 'Abaixo do ritmo', cls: 'tag-strong' },
   late: { label: 'Prazo passou', cls: 'tag-strong' },
   'no-deadline': { label: 'Sem prazo', cls: 'tag-muted' },
+  new: { label: 'Comece a guardar', cls: 'tag-muted' },
 };
 
 function goalHint(g: GoalDTO, hidden: boolean) {

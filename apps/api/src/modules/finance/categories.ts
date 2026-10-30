@@ -8,7 +8,7 @@ import { toCategoryDTO } from './queries';
 export const CATEGORY_ICON_KEYS = [
   'food', 'cart', 'bus', 'car', 'fuel', 'home', 'bolt', 'water', 'wifi', 'phone', 'subs', 'fun', 'game', 'travel', 'health',
   'fitness', 'shopping', 'clothes', 'education', 'book', 'pet', 'baby', 'gift', 'coffee', 'beauty', 'work', 'savings', 'tools',
-  'income', 'transfer', 'other',
+  'card', 'income', 'transfer', 'other',
 ] as const;
 
 const body = z.object({
