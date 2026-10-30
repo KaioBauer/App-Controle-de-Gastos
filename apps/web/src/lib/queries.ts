@@ -5,9 +5,11 @@ import type {
   BudgetsDTO,
   CardsDTO,
   CategoryDTO,
+  CompareDTO,
   ConnectionsDTO,
   NotificationSettingsDTO,
   Period,
+  ReportsDTO,
   RuleDTO,
   SummaryDTO,
   TransactionDTO,
@@ -130,6 +132,15 @@ export function useBillAction() {
   });
 }
 
+export const useReports = () => useQuery({ queryKey: ['reports'], queryFn: () => api<ReportsDTO>('/reports') });
+
+export const useCompare = (a: string, b: string) =>
+  useQuery({
+    queryKey: ['compare', a, b],
+    queryFn: () => api<CompareDTO>(`/reports/compare?a=${a}&b=${b}`),
+    placeholderData: keepPreviousData,
+  });
+
 export const useRules = () => useQuery({ queryKey: ['rules'], queryFn: () => api<RuleDTO[]>('/rules') });
 
 /** Atualiza o número no ícone depois de revisar transações. */
@@ -146,7 +157,7 @@ function useInvalidateFinance() {
   const qc = useQueryClient();
   return () => {
     void Promise.all([
-      ...['summary', 'analysis', 'budgets', 'transactions', 'cards', 'bill', 'bills', 'similar', 'rules', 'badge'].map((key) =>
+      ...['summary', 'analysis', 'budgets', 'transactions', 'cards', 'bill', 'bills', 'similar', 'rules', 'badge', 'reports', 'compare'].map((key) =>
         qc.invalidateQueries({ queryKey: [key] }),
       ),
       refreshBadge(),

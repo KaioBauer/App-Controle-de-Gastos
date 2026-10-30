@@ -136,6 +136,22 @@ export interface ConnectionsDTO {
   connections: ConnectionDTO[];
 }
 
+export interface ReportsDTO {
+  cashflow: { month: string; incomeCents: number; expenseCents: number }[];
+  /** Saldo em conta (corrente + dinheiro) ao fim de cada mês */
+  balance: { month: string; balanceCents: number }[];
+  liquidCents: number;
+  investmentsCents: number;
+}
+
+export interface CompareDTO {
+  a: string;
+  b: string;
+  aTotalCents: number;
+  bTotalCents: number;
+  rows: { id: string; name: string; icon: string; aCents: number; bCents: number; deltaCents: number }[];
+}
+
 export type BillStatus = 'pending' | 'overdue' | 'paid';
 
 export interface BillDTO {

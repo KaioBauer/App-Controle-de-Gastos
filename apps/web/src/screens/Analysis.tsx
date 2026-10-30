@@ -4,6 +4,7 @@ import { Money } from '../lib/privacy';
 import { useAnalysis } from '../lib/queries';
 import { Bars, Donut } from '../ui/charts';
 import { OfflineBanner } from '../ui/common';
+import { Reports } from './Reports';
 
 const PERIODS: { id: Period; label: string }[] = [
   { id: 'week', label: 'Semana' },
@@ -95,6 +96,7 @@ export function Analysis() {
           </div>
         </section>
       )}
+      <Reports />
     </main>
   );
 }
