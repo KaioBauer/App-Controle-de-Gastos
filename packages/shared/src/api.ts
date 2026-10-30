@@ -136,6 +136,22 @@ export interface ConnectionsDTO {
   connections: ConnectionDTO[];
 }
 
+export interface GoalDTO {
+  id: string;
+  name: string;
+  icon: string;
+  targetCents: number;
+  deadline: string | null;
+  savedCents: number;
+  pct: number;
+  remainingCents: number;
+  monthsLeft: number | null;
+  perMonthCents: number | null;
+  paceCents: number;
+  status: 'done' | 'on-track' | 'behind' | 'no-deadline' | 'late';
+  contributions: { id: string; amountCents: number; localDate: string }[];
+}
+
 export interface ReportsDTO {
   cashflow: { month: string; incomeCents: number; expenseCents: number }[];
   /** Saldo em conta (corrente + dinheiro) ao fim de cada mês */

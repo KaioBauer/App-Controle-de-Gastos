@@ -6,6 +6,7 @@ import type {
   CardsDTO,
   CategoryDTO,
   CompareDTO,
+  GoalDTO,
   ConnectionsDTO,
   NotificationSettingsDTO,
   Period,
@@ -140,6 +141,30 @@ export const useCompare = (a: string, b: string) =>
     queryFn: () => api<CompareDTO>(`/reports/compare?a=${a}&b=${b}`),
     placeholderData: keepPreviousData,
   });
+
+export const useGoals = () => useQuery({ queryKey: ['goals'], queryFn: () => api<GoalDTO[]>('/goals') });
+
+export function useGoalAction() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (
+      a:
+        | { type: 'save'; id?: string; name: string; targetCents: number; deadline: string | null }
+        | { type: 'delete'; id: string }
+        | { type: 'contribute'; id: string; amountCents: number; kind: 'deposit' | 'withdraw' }
+        | { type: 'undo'; id: string; contributionId: string },
+    ) => {
+      if (a.type === 'save') {
+        const body = { name: a.name, targetCents: a.targetCents, deadline: a.deadline };
+        return a.id ? api(`/goals/${a.id}`, { method: 'PATCH', body }) : api('/goals', { method: 'POST', body });
+      }
+      if (a.type === 'delete') return api(`/goals/${a.id}`, { method: 'DELETE' });
+      if (a.type === 'contribute') return api(`/goals/${a.id}/contributions`, { method: 'POST', body: { amountCents: a.amountCents, kind: a.kind } });
+      return api(`/goals/${a.id}/contributions/${a.contributionId}`, { method: 'DELETE' });
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['goals'] }),
+  });
+}
 
 export const useRules = () => useQuery({ queryKey: ['rules'], queryFn: () => api<RuleDTO[]>('/rules') });
 

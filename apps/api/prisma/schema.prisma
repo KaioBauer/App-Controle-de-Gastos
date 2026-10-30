@@ -150,6 +150,30 @@ model Investment {
   updatedAt    DateTime   @updatedAt
 }
 
+// Meta de economia com aportes manuais
+model Goal {
+  id            String             @id @default(uuid())
+  name          String
+  targetCents   BigInt
+  // Prazo opcional (YYYY-MM-DD)
+  deadline      String?
+  icon          String             @default("target")
+  createdAt     DateTime           @default(now())
+  contributions GoalContribution[]
+}
+
+model GoalContribution {
+  id          String   @id @default(uuid())
+  goalId      String
+  goal        Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  // Positivo = aporte, negativo = retirada
+  amountCents BigInt
+  localDate   String
+  createdAt   DateTime @default(now())
+
+  @@index([goalId, localDate])
+}
+
 // Conta a pagar: mensal (dueDay) ou única (dueDate)
 model Bill {
   id          String        @id @default(uuid())

@@ -9,6 +9,7 @@ import { CategoryIcon } from '../ui/icons';
 import { Keypad, useCentsInput } from '../ui/Keypad';
 import { Sheet, useSheet } from '../ui/Sheet';
 import { useToast } from '../ui/Toast';
+import { Goals } from './Goals';
 
 const BAR_COLOR = { ok: 'var(--accent)', warn: 'var(--accent)', full: 'var(--c3)', over: 'var(--ink)' } as const;
 
@@ -104,6 +105,8 @@ export function Budgets() {
           Novo orçamento
         </button>
       )}
+
+      <Goals />
 
       <BudgetSheet state={sheet.state} onClose={sheet.close} editing={editing} available={data?.available ?? []} />
     </main>
