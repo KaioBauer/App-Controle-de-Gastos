@@ -167,7 +167,7 @@ p {
   max-width: 560px;
   margin: 0 auto;
   min-height: 100dvh;
-  padding: calc(var(--safe-top) + 22px) calc(var(--gutter) + var(--safe-right)) calc(var(--dock-bottom) + 104px)
+  padding: calc(var(--safe-top) + 34px) calc(var(--gutter) + var(--safe-right)) calc(var(--dock-bottom) + 104px)
     calc(var(--gutter) + var(--safe-left));
   display: flex;
   flex-direction: column;
