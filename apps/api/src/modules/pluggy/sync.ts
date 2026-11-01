@@ -12,6 +12,7 @@ import {
 } from '../../domain/pluggy-mapping';
 import { asSystem, currentUserId, prisma, runAsUser } from '../../lib/db';
 import type { PluggyAccount, PluggyClient, PluggyTransaction } from './client';
+import type { PluggyClients } from './clients';
 
 /** Na primeira sincronização trazemos 12 meses (o máximo usual do Open Finance). */
 const BACKFILL_DAYS = 365;
@@ -31,27 +32,34 @@ export interface SyncResult {
 // Um sync por item por vez (instância única da API)
 const running = new Map<string, Promise<SyncResult>>();
 
-/** Sincroniza um item no contexto do dono dele (webhook e job não têm usuário). */
-export function syncItem(client: PluggyClient, itemId: string, log: FastifyBaseLogger): Promise<SyncResult> {
+/**
+ * Sincroniza um item no contexto do dono dele (webhook e job não têm usuário), com as
+ * credenciais da Pluggy desse dono.
+ */
+export function syncItem(clients: PluggyClients, itemId: string, log: FastifyBaseLogger): Promise<SyncResult> {
   const current = running.get(itemId);
   if (current) return current;
   const p = asSystem(() => prisma.pluggyItem.findUnique({ where: { id: itemId }, select: { userId: true } }))
     .then((owner) => {
       if (!owner) throw new Error(`Item ${itemId} não cadastrado`);
-      return runAsUser(owner.userId, () => doSync(client, itemId, log));
+      return runAsUser(owner.userId, async () => {
+        const client = await clients.forCurrentUser();
+        if (!client) throw new Error('Pluggy não configurada: cadastre o Client ID e o Client Secret em Ajustes › Conexões');
+        return doSync(client, itemId, log);
+      });
     })
     .finally(() => running.delete(itemId));
   running.set(itemId, p);
   return p;
 }
 
-export async function syncAll(client: PluggyClient, log: FastifyBaseLogger) {
+export async function syncAll(clients: PluggyClients, log: FastifyBaseLogger) {
   // Itens de todos os usuários; cada sync roda no contexto do dono
   const items = await asSystem(() => prisma.pluggyItem.findMany({ select: { id: true } }));
   const results: SyncResult[] = [];
   for (const { id } of items) {
     try {
-      results.push(await syncItem(client, id, log));
+      results.push(await syncItem(clients, id, log));
     } catch (err) {
       log.error({ err, itemId: id }, 'Falha ao sincronizar item da Pluggy');
     }

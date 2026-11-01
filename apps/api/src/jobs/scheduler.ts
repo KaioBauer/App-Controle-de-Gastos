@@ -2,13 +2,13 @@ import type { FastifyBaseLogger } from 'fastify';
 import cron, { type ScheduledTask } from 'node-cron';
 import { forEachUser } from '../lib/db';
 import type { Notifier } from '../modules/notifications/service';
-import type { PluggyClient } from '../modules/pluggy/client';
+import type { PluggyClients } from '../modules/pluggy/clients';
 import { syncAll } from '../modules/pluggy/sync';
 
 const TZ = 'America/Sao_Paulo';
 
 /** Jobs agendados (fuso de São Paulo). Só uma instância da API roda, então não há disputa. */
-export function startScheduler(client: PluggyClient | null, notifier: Notifier, log: FastifyBaseLogger) {
+export function startScheduler(clients: PluggyClients, notifier: Notifier, log: FastifyBaseLogger) {
   const tasks: ScheduledTask[] = [];
   const every = (expr: string, name: string, fn: () => Promise<unknown>) =>
     tasks.push(
@@ -22,7 +22,7 @@ export function startScheduler(client: PluggyClient | null, notifier: Notifier, 
     );
 
   // Rede de segurança caso algum webhook da Pluggy se perca
-  if (client) every('7 * * * *', 'pluggy-sync', () => syncAll(client, log));
+  every('7 * * * *', 'pluggy-sync', () => syncAll(clients, log));
 
   // Avisos: cada usuário com a própria fila, preferências e aparelhos
   const perUser = (name: string, fn: () => Promise<unknown>) => () =>

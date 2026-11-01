@@ -1,6 +1,8 @@
 import type { ConnectionDTO, ConnectionHealth } from '@financas/shared';
-import { Landmark, Plus, RefreshCw, Trash2, Webhook } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { KeyRound, Landmark, Plus, RefreshCw, Trash2, Webhook } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
+import { api } from '../lib/api';
 import { Money } from '../lib/privacy';
 import { useAddConnection, useConnections, useRegisterWebhook, useRemoveConnection, useSyncConnection } from '../lib/queries';
 import { OfflineBanner, PageHeader } from '../ui/common';
@@ -46,12 +48,7 @@ export function Connections() {
 
       {error && !data && <p className="muted">Não foi possível carregar. {error.message}</p>}
 
-      {data && !data.configured && (
-        <div className="card-lg empty">
-          <span style={{ color: 'var(--ink)', fontWeight: 600 }}>Pluggy não configurada</span>
-          <span className="small">Defina PLUGGY_CLIENT_ID e PLUGGY_CLIENT_SECRET no .env do servidor.</span>
-        </div>
-      )}
+      <PluggyCredentials />
 
       {data?.configured && data.connections.length === 0 && (
         <div className="card-lg empty fu">
@@ -188,6 +185,169 @@ export function Connections() {
         <RemoveConnection connection={removing} onDone={removeSheet.close} />
       </Sheet>
     </main>
+  );
+}
+
+interface CredentialsInfo {
+  canStore: boolean;
+  /** own: do usuário; default: do .env do servidor; null: nenhuma */
+  source: 'own' | 'default' | null;
+  clientIdHint: string | null;
+}
+
+/**
+ * Client ID e Client Secret do Meu Pluggy do usuário. Cada conta do Meu Pluggy só enxerga as
+ * próprias conexões: quem tem a sua conta cadastra as próprias credenciais aqui.
+ */
+function PluggyCredentials() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const sheet = useSheet();
+  const info = useQuery({ queryKey: ['pluggy-credentials'], queryFn: () => api<CredentialsInfo>('/pluggy/credentials') });
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ['pluggy-credentials'] });
+    qc.invalidateQueries({ queryKey: ['connections'] });
+  };
+  const remove = useMutation({
+    mutationFn: () => api('/pluggy/credentials', { method: 'DELETE' }),
+    onSuccess: () => {
+      toast('Credenciais removidas');
+      refresh();
+    },
+  });
+  if (!info.data) return null;
+  const { source, clientIdHint, canStore } = info.data;
+
+  return (
+    <section className="card-lg stack fu" style={{ gap: 12 }} aria-label="Credenciais do Meu Pluggy">
+      <div className="row" style={{ gap: 12 }}>
+        <span className="tile">
+          <KeyRound size={20} strokeWidth={1.8} aria-hidden="true" />
+        </span>
+        <div className="item-main">
+          <span className="item-title">Credenciais do Meu Pluggy</span>
+          <span className="item-sub">
+            {source === 'own'
+              ? `As suas · Client ID ${clientIdHint}`
+              : source === 'default'
+                ? `Padrão do servidor · Client ID ${clientIdHint}`
+                : 'Nenhuma cadastrada'}
+          </span>
+        </div>
+      </div>
+      {source !== 'own' && (
+        <p className="small muted" style={{ lineHeight: 1.45 }}>
+          {source === 'default'
+            ? 'Se as suas conexões estão em outra conta do Meu Pluggy, cadastre o Client ID e o Client Secret dela.'
+            : 'Para trazer os seus bancos, cadastre o Client ID e o Client Secret da sua conta em meu.pluggy.ai.'}
+        </p>
+      )}
+      {canStore ? (
+        <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+          <button type="button" className="chip row" style={{ gap: 6, height: 44 }} onClick={sheet.open}>
+            <KeyRound size={16} strokeWidth={2} aria-hidden="true" />
+            {source === 'own' ? 'Trocar credenciais' : 'Cadastrar minhas credenciais'}
+          </button>
+          {source === 'own' && (
+            <button
+              type="button"
+              className="chip row"
+              style={{ gap: 6, height: 44, color: 'var(--danger)' }}
+              disabled={remove.isPending}
+              onClick={() => remove.mutate()}
+            >
+              <Trash2 size={16} strokeWidth={2} aria-hidden="true" />
+              Remover
+            </button>
+          )}
+        </div>
+      ) : (
+        <p className="small muted">O servidor ainda não está configurado para guardar credenciais (CREDENTIALS_KEY no .env).</p>
+      )}
+      <CredentialsSheet state={sheet.state} onClose={sheet.close} onSaved={refresh} />
+    </section>
+  );
+}
+
+function CredentialsSheet({ state, onClose, onSaved }: { state: 'closed' | 'open' | 'closing'; onClose: () => void; onSaved: () => void }) {
+  const [clientId, setClientId] = useState('');
+  const [clientSecret, setClientSecret] = useState('');
+  const toast = useToast();
+  const save = useMutation({
+    mutationFn: () => api<{ ok: boolean; webhook: boolean }>('/pluggy/credentials', { method: 'PUT', body: { clientId: clientId.trim(), clientSecret: clientSecret.trim() } }),
+    onSuccess: (r) => {
+      toast(r.webhook ? 'Credenciais salvas e webhook ativo' : 'Credenciais salvas');
+      onSaved();
+      onClose();
+    },
+  });
+
+  useEffect(() => {
+    if (state === 'open') {
+      setClientId('');
+      setClientSecret('');
+      save.reset();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]);
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    save.mutate();
+  };
+  const field = { height: 56, borderRadius: 18, border: 0, background: 'var(--fill)', padding: '0 18px', fontSize: 16, outline: 'none' } as const;
+
+  return (
+    <Sheet state={state} onClose={onClose} title="Credenciais do Meu Pluggy">
+      <ol className="stack small muted" style={{ gap: 8, margin: 0, paddingLeft: 20, lineHeight: 1.45 }}>
+        <li>
+          Entre em <strong style={{ color: 'var(--ink)' }}>meu.pluggy.ai</strong> com a sua conta.
+        </li>
+        <li>Copie o Client ID e o Client Secret (área de desenvolvedor / API).</li>
+        <li>Cole abaixo. O secret fica guardado cifrado no servidor e não aparece de novo.</li>
+      </ol>
+      <form onSubmit={submit} className="stack" style={{ gap: 12 }}>
+        <label className="visually-hidden" htmlFor="pluggy-client-id">
+          Client ID
+        </label>
+        <input
+          id="pluggy-client-id"
+          value={clientId}
+          onChange={(e) => setClientId(e.target.value)}
+          placeholder="Client ID"
+          autoCapitalize="none"
+          autoCorrect="off"
+          autoComplete="off"
+          spellCheck={false}
+          required
+          style={field}
+        />
+        <label className="visually-hidden" htmlFor="pluggy-client-secret">
+          Client Secret
+        </label>
+        <input
+          id="pluggy-client-secret"
+          type="password"
+          value={clientSecret}
+          onChange={(e) => setClientSecret(e.target.value)}
+          placeholder="Client Secret"
+          autoCapitalize="none"
+          autoCorrect="off"
+          autoComplete="off"
+          spellCheck={false}
+          required
+          style={field}
+        />
+        {save.error && (
+          <p className="small" style={{ color: 'var(--danger)' }}>
+            {save.error.message}
+          </p>
+        )}
+        <button type="submit" className="btn" disabled={!clientId.trim() || !clientSecret.trim() || save.isPending}>
+          {save.isPending ? 'Conferindo na Pluggy…' : 'Salvar'}
+        </button>
+      </form>
+    </Sheet>
   );
 }
 

@@ -34,6 +34,7 @@ model User {
   budgets              Budget[]
   notificationSettings NotificationSettings?
   notificationOutbox   NotificationOutbox[]
+  pluggyCredential     PluggyCredential?
 }
 
 // Passkey (Face ID / Touch ID / chave de segurança) para entrar sem senha
@@ -133,6 +134,17 @@ enum AccountType {
   CREDIT
   INVESTMENT
   CASH
+}
+
+// Credenciais do Meu Pluggy do usuário (cada conta do Meu Pluggy só enxerga as próprias conexões)
+model PluggyCredential {
+  userId    String   @id
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clientId  String
+  // Client Secret cifrado (ver lib/crypto.ts); a chave fica só no .env
+  secretEnc String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // Conexão do Meu Pluggy (o id é o itemId da Pluggy)

@@ -19,6 +19,7 @@ const OWNED = new Set<string>([
   'Category',
   'CategoryRule',
   'PluggyItem',
+  'PluggyCredential',
   'Account',
   'CreditCardBill',
   'Investment',

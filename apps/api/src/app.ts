@@ -13,12 +13,12 @@ import { reportRoutes } from './modules/finance/reports';
 import { financeRoutes } from './modules/finance/routes';
 import { transactionRoutes } from './modules/finance/transactions';
 import { notificationRoutes } from './modules/notifications/routes';
-import type { PluggyClient } from './modules/pluggy/client';
+import type { PluggyClients } from './modules/pluggy/clients';
 import { pluggyRoutes } from './modules/pluggy/routes';
 import { pushRoutes } from './modules/push/routes';
 import { registerSession } from './plugins/session';
 
-export async function buildApp(env: Env, pluggy: PluggyClient | null) {
+export async function buildApp(env: Env, clients: PluggyClients) {
   const app = Fastify({
     logger: {
       level: env.NODE_ENV === 'production' ? 'info' : 'debug',
@@ -61,7 +61,7 @@ export async function buildApp(env: Env, pluggy: PluggyClient | null) {
       await api.register(goalRoutes);
       await api.register(categoryRoutes);
       await api.register(notificationRoutes);
-      await api.register(pluggyRoutes, { env, client: pluggy });
+      await api.register(pluggyRoutes, { env, clients });
     },
     { prefix: '/api' },
   );

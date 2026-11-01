@@ -22,6 +22,13 @@ const schema = z.object({
     .optional()
     .transform((v) => v || undefined)
     .refine((v) => !v || v.length >= 24, 'Use pelo menos 24 caracteres aleatórios'),
+  // Chave para cifrar as credenciais da Pluggy de cada usuário (gere com: openssl rand -base64 32)
+  CREDENTIALS_KEY: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v) => v || undefined)
+    .refine((v) => !v || Buffer.from(v, 'base64').length === 32, 'Gere com: openssl rand -base64 32'),
 });
 
 export type Env = z.infer<typeof schema>;

@@ -73,6 +73,8 @@ As migrations rodam sozinhas no start da API. O `.env` de produção fica só na
 ssh -t root@2.24.114.161 "cd /opt/kaixa && docker compose -p kaixa exec api node dist/cli/create-user.js"
 ```
 
+**Pluggy por usuário:** cada conta do Meu Pluggy só enxerga as próprias conexões. Cada usuário cadastra o Client ID e o Client Secret dele em Ajustes › Conexões; o secret é guardado cifrado (AES-256-GCM) com a `CREDENTIALS_KEY` do `.env`. Quem não cadastrar usa `PLUGGY_CLIENT_ID/SECRET` do `.env`. O sync e o webhook usam as credenciais do dono de cada conexão. Se a `CREDENTIALS_KEY` mudar, as credenciais salvas precisam ser cadastradas de novo.
+
 **Push pelo terminal:** `deploy/push.sh --listar` mostra os usuários e aparelhos; `deploy/push.sh --usuario <nome> "Título" "Mensagem" [--url /contas]` envia para uma pessoa.
 
 **Proxy:** o bloco do Kaixa está em `deploy/nginx.vps.conf`, instalado como `/opt/proxy/sites/kaixa.conf`. Depois de mudar, rode `docker exec proxy nginx -t && docker exec proxy nginx -s reload`. O certificado renova sozinho por webroot, sem derrubar o proxy.
