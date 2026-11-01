@@ -25,6 +25,9 @@ const SYNC_EVENTS = new Set([
   'transactions/deleted',
 ]);
 
+/** Ao abrir o app, copia de novo da Pluggy se a última cópia tiver mais que isso. */
+const REFRESH_AFTER_MS = 15 * 60 * 1000;
+
 const itemIdBody = z.object({ itemId: z.string().trim().uuid('O itemId é um UUID (ex.: 3f2b…-…)') });
 
 function safeEqual(a: string, b: string) {
@@ -220,6 +223,29 @@ export async function pluggyRoutes(app: FastifyInstance, { env, clients }: { env
         return syncItem(clients, itemId, request.log);
       },
     );
+
+    /**
+     * Chamado pelo app ao abrir: copia o que a Pluggy tem de novo se a última cópia ficou velha.
+     * (Conexões do Meu Pluggy não aceitam pedido de atualização: o Meu Pluggy busca no banco
+     * no ritmo dele, e o webhook e o job de hora em hora trazem o resto.)
+     */
+    auth.post('/pluggy/refresh', { config: { rateLimit: { max: 6, timeWindow: '1 minute' } } }, async (request) => {
+      const staleBefore = new Date(Date.now() - REFRESH_AFTER_MS);
+      const items = await prisma.pluggyItem.findMany({
+        where: { OR: [{ lastSyncAt: null }, { lastSyncAt: { lt: staleBefore } }] },
+        select: { id: true },
+      });
+      let created = 0;
+      for (const { id } of items) {
+        await syncItem(clients, id, request.log).then(
+          (r) => {
+            created += r.created;
+          },
+          (err) => request.log.warn({ err, itemId: id }, 'Atualização ao abrir o app falhou'),
+        );
+      }
+      return { synced: items.length, created };
+    });
 
     auth.post('/pluggy/sync', { config: { rateLimit: { max: 5, timeWindow: '1 minute' } } }, async (request) => {
       // Só as conexões do usuário da sessão

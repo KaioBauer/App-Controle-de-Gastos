@@ -64,8 +64,12 @@ function useServiceWorkerNavigation() {
   }, [navigate]);
 }
 
-/** Mantém o badge do ícone e a inscrição de push em dia sempre que o app volta ao primeiro plano. */
+/**
+ * Sempre que o app volta ao primeiro plano: badge do ícone, inscrição de push e dados do banco
+ * (se a última cópia da Pluggy ficou velha, o servidor busca de novo e a tela se atualiza).
+ */
 function useForegroundSync(enabled: boolean) {
+  const qc = useQueryClient();
   useEffect(() => {
     if (!enabled) return;
     const sync = () => {
@@ -74,11 +78,16 @@ function useForegroundSync(enabled: boolean) {
         .then(({ count }) => setBadge(count))
         .catch(() => {});
       syncSubscription();
+      api<{ synced: number }>('/pluggy/refresh', { method: 'POST' })
+        .then(({ synced }) => {
+          if (synced > 0) void qc.invalidateQueries({ predicate: (q) => q.queryKey[0] !== 'me' });
+        })
+        .catch(() => {});
     };
     sync();
     document.addEventListener('visibilitychange', sync);
     return () => document.removeEventListener('visibilitychange', sync);
-  }, [enabled]);
+  }, [enabled, qc]);
 }
 
 /**
