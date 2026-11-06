@@ -85,12 +85,17 @@ export const prisma = base.$extends({
 
 export type Db = typeof prisma;
 
-export function runAsUser<T>(userId: string, fn: () => T): T {
-  return scope.run({ userId }, fn);
+/**
+ * O resultado é aguardado dentro do contexto: consultas do Prisma são preguiçosas e só rodam
+ * no `await`/`.then`. Sem isso, `asSystem(() => prisma.x.findMany())` executaria a consulta
+ * depois que o contexto já fechou (e falharia nos jobs, que não têm usuário de requisição).
+ */
+export function runAsUser<T>(userId: string, fn: () => T): Promise<Awaited<T>> {
+  return scope.run({ userId }, async (): Promise<Awaited<T>> => await fn());
 }
 
-export function asSystem<T>(fn: () => T): T {
-  return scope.run({ system: true }, fn);
+export function asSystem<T>(fn: () => T): Promise<Awaited<T>> {
+  return scope.run({ system: true }, async (): Promise<Awaited<T>> => await fn());
 }
 
 /** Usuário do contexto atual (para chaves compostas como userId + nome). */
