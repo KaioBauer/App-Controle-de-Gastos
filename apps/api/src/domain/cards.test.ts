@@ -17,7 +17,7 @@ const tx = (p: Partial<CardTx> & Pick<CardTx, 'localDate' | 'amountCents' | 'des
 describe('billCycle', () => {
   it('infere fechamento pela última compra da fatura fechada (Nubank: fecha dia 4, vence dia 13)', () => {
     const c = billCycle({ dueDate: '2026-10-13', lastTxDate: '2026-10-04' }, '2026-10-30');
-    expect(c).toEqual({ lastClose: '2026-10-04', nextClose: '2026-11-04', nextDue: '2026-11-13' });
+    expect(c).toEqual({ lastClose: '2026-10-04', nextClose: '2026-11-04', nextDue: '2026-11-13', openAfter: null });
   });
 
   it('avança o ciclo se o sync estiver atrasado', () => {
@@ -27,7 +27,21 @@ describe('billCycle', () => {
   });
 
   it('sem faturas, assume fechamento em um mês', () => {
-    expect(billCycle(null, '2026-10-30')).toEqual({ lastClose: null, nextClose: '2026-11-30', nextDue: null });
+    expect(billCycle(null, '2026-10-30')).toEqual({ lastClose: null, nextClose: '2026-11-30', nextDue: null, openAfter: null });
+  });
+});
+
+describe('fatura recém-fechada que a Pluggy ainda não trouxe', () => {
+  it('não soma as compras da fatura que fechou na fatura aberta', () => {
+    // Última fatura conhecida fechou 04/10; hoje é 06/11, então a de 04/11 já fechou
+    const cycle = billCycle({ dueDate: '2026-10-13', lastTxDate: '2026-10-04' }, '2026-11-06');
+    expect(cycle).toMatchObject({ lastClose: '2026-11-04', nextClose: '2026-12-04', openAfter: '2026-11-04' });
+    const txs = [
+      tx({ localDate: '2026-10-20', amountCents: -10000, description: 'Fatura que fechou', status: 'PENDING' }),
+      tx({ localDate: '2026-11-04', amountCents: -2000, description: 'Dia do fechamento', status: 'PENDING' }),
+      tx({ localDate: '2026-11-05', amountCents: -3000, description: 'Fatura nova', status: 'PENDING' }),
+    ];
+    expect(openBillTxs(txs, cycle).map((t) => t.description)).toEqual(['Fatura nova']);
   });
 });
 

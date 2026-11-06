@@ -26,6 +26,12 @@ export interface BillCycle {
   /** Fechamento e vencimento estimados da fatura aberta */
   nextClose: string;
   nextDue: string | null;
+  /**
+   * Quando o fechamento estimado já passou mas a Pluggy ainda não trouxe a fatura nova,
+   * as compras da fatura que fechou continuam pendentes e sem `billId`. Só entram na
+   * fatura aberta as compras depois desta data.
+   */
+  openAfter?: string | null;
 }
 
 /**
@@ -35,21 +41,26 @@ export interface BillCycle {
  */
 export function billCycle(lastBill: { dueDate: string; lastTxDate: string | null } | null, today: string): BillCycle {
   if (!lastBill?.lastTxDate) {
-    return { lastClose: null, nextClose: addMonthsYmd(today, 1), nextDue: lastBill ? addMonthsYmd(lastBill.dueDate, 1) : null };
+    return { lastClose: null, nextClose: addMonthsYmd(today, 1), nextDue: lastBill ? addMonthsYmd(lastBill.dueDate, 1) : null, openAfter: null };
   }
   let lastClose = lastBill.lastTxDate;
   let nextDue = addMonthsYmd(lastBill.dueDate, 1);
-  // Se a fatura "aberta" estimada já fechou (sync atrasado), avança os ciclos
+  let openAfter: string | null = null;
+  // Se a fatura "aberta" estimada já fechou (Pluggy ainda sem a fatura nova), avança os ciclos
   while (addMonthsYmd(lastClose, 1) < today) {
     lastClose = addMonthsYmd(lastClose, 1);
     nextDue = addMonthsYmd(nextDue, 1);
+    openAfter = lastClose;
   }
-  return { lastClose, nextClose: addMonthsYmd(lastClose, 1), nextDue };
+  return { lastClose, nextClose: addMonthsYmd(lastClose, 1), nextDue, openAfter };
 }
 
-/** Compras da fatura aberta: ainda pendentes e até o próximo fechamento. */
+/** Compras da fatura aberta: ainda pendentes, sem fatura e dentro do ciclo atual. */
 export function openBillTxs(txs: CardTx[], cycle: BillCycle): CardTx[] {
-  return txs.filter((t) => t.status === 'PENDING' && t.localDate <= cycle.nextClose && !t.billId);
+  const after = cycle.openAfter;
+  return txs.filter(
+    (t) => t.status === 'PENDING' && t.localDate <= cycle.nextClose && !t.billId && (!after || t.localDate > after),
+  );
 }
 
 /** Total gasto numa lista (pagamentos da fatura são transferência e não entram; estornos abatem). */
