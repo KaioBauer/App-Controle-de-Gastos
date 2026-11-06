@@ -21,43 +21,57 @@ export interface CardTx extends FlowTx {
 // ---------------------------------------------------------------------------
 
 export interface BillCycle {
-  /** Fechamento da última fatura fechada (estimado pela última compra dela) */
+  /** Fechamento da última fatura fechada (estimado) */
   lastClose: string | null;
   /** Fechamento e vencimento estimados da fatura aberta */
   nextClose: string;
   nextDue: string | null;
-  /**
-   * Quando o fechamento estimado já passou mas a Pluggy ainda não trouxe a fatura nova,
-   * as compras da fatura que fechou continuam pendentes e sem `billId`. Só entram na
-   * fatura aberta as compras depois desta data.
-   */
-  openAfter?: string | null;
 }
 
+export interface BillRef {
+  dueDate: string;
+  /** Data da última compra ligada à fatura */
+  lastTxDate: string | null;
+}
+
+const monthIndex = (ymd: string) => Number(ymd.slice(0, 4)) * 12 + Number(ymd.slice(5, 7));
+
 /**
- * A Pluggy não informa a data de fechamento do Nubank, então ela é inferida:
- * a última fatura fechada termina na data da última transação ligada a ela,
- * e a fatura aberta fecha um mês depois. O vencimento segue o da última fatura + 1 mês.
+ * A Pluggy não informa a data de fechamento do Nubank, então ela é inferida.
+ * Nenhuma compra de uma fatura é posterior ao fechamento dela, então a última compra
+ * ligada a cada fatura é um limite inferior. Mas a Pluggy só liga à fatura as compras
+ * já confirmadas, e logo após o fechamento a fatura nova vem com poucas compras.
+ * Por isso o fechamento da última fatura é o maior entre a última compra dela e as
+ * últimas compras das faturas anteriores projetadas para o mesmo mês.
+ * `bills` vem do vencimento mais recente para o mais antigo.
  */
-export function billCycle(lastBill: { dueDate: string; lastTxDate: string | null } | null, today: string): BillCycle {
-  if (!lastBill?.lastTxDate) {
-    return { lastClose: null, nextClose: addMonthsYmd(today, 1), nextDue: lastBill ? addMonthsYmd(lastBill.dueDate, 1) : null, openAfter: null };
+export function billCycle(bills: BillRef[], today: string): BillCycle {
+  const last = bills[0];
+  let lastClose: string | null = null;
+  for (const b of bills.slice(0, 4)) {
+    if (!b.lastTxDate) continue;
+    const projected = addMonthsYmd(b.lastTxDate, monthIndex(last!.dueDate) - monthIndex(b.dueDate));
+    if (!lastClose || projected > lastClose) lastClose = projected;
   }
-  let lastClose = lastBill.lastTxDate;
-  let nextDue = addMonthsYmd(lastBill.dueDate, 1);
-  let openAfter: string | null = null;
+  if (!last || !lastClose) {
+    return { lastClose: null, nextClose: addMonthsYmd(today, 1), nextDue: last ? addMonthsYmd(last.dueDate, 1) : null };
+  }
+  let nextDue = addMonthsYmd(last.dueDate, 1);
   // Se a fatura "aberta" estimada já fechou (Pluggy ainda sem a fatura nova), avança os ciclos
   while (addMonthsYmd(lastClose, 1) < today) {
     lastClose = addMonthsYmd(lastClose, 1);
     nextDue = addMonthsYmd(nextDue, 1);
-    openAfter = lastClose;
   }
-  return { lastClose, nextClose: addMonthsYmd(lastClose, 1), nextDue, openAfter };
+  return { lastClose, nextClose: addMonthsYmd(lastClose, 1), nextDue };
 }
 
-/** Compras da fatura aberta: ainda pendentes, sem fatura e dentro do ciclo atual. */
+/**
+ * Compras da fatura aberta: pendentes, sem fatura e depois do último fechamento.
+ * O limite inferior importa: a Pluggy deixa as compras da fatura recém-fechada
+ * pendentes e sem `billId` até confirmá-las.
+ */
 export function openBillTxs(txs: CardTx[], cycle: BillCycle): CardTx[] {
-  const after = cycle.openAfter;
+  const after = cycle.lastClose;
   return txs.filter(
     (t) => t.status === 'PENDING' && t.localDate <= cycle.nextClose && !t.billId && (!after || t.localDate > after),
   );

@@ -53,12 +53,14 @@ export async function buildCards(today = localDate(new Date())): Promise<CardsDT
         purchaseDate: r.purchaseDate,
       }));
 
-      const lastBill = acc.bills[0];
-      const lastBillTxDate = lastBill
-        ? (await prisma.transaction.aggregate({ where: { billId: lastBill.id }, _max: { localDate: true } }))._max.localDate
-        : null;
+      // Última compra ligada a cada uma das faturas recentes (para inferir o fechamento)
+      const recent = acc.bills.slice(0, 4);
+      const lastTx = recent.length
+        ? await prisma.transaction.groupBy({ by: ['billId'], where: { billId: { in: recent.map((b) => b.id) } }, _max: { localDate: true } })
+        : [];
+      const lastTxByBill = new Map(lastTx.map((r) => [r.billId, r._max.localDate]));
       const cycle = billCycle(
-        lastBill ? { dueDate: lastBill.dueDate.toISOString().slice(0, 10), lastTxDate: lastBillTxDate } : null,
+        recent.map((b) => ({ dueDate: b.dueDate.toISOString().slice(0, 10), lastTxDate: lastTxByBill.get(b.id) ?? null })),
         today,
       );
 
